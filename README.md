@@ -70,7 +70,7 @@ ReporterProperties reporterProperties = new ReporterProperties()
         .setSenderExecutor(new ThreadPoolExecutor(200,
             200, 0, TimeUnit.MILLISECONDS, new SynchronousQueue<>()));
 
-BatchedJdbcTemplate template = new BatchedJdbcTemplate(reporterProperties);
+BatchJdbcTemplate template = new BatchJdbcTemplate(reporterProperties);
 template.setDataSource(dataSource);
 
 Promise promise = template.update(...);
