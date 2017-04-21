@@ -1,7 +1,0 @@
-io/bufferslayer/DefaultSenderToAsnycSenderAdaptorTest.class
-io/bufferslayer/FakeSender.class
-io/bufferslayer/TestMessage.class
-io/bufferslayer/OverflowStrategyTest.class
-io/bufferslayer/AsyncReporterTest.class
-io/bufferslayer/TestMessage$Key.class
-io/bufferslayer/SizeBoundedQueueTest.class

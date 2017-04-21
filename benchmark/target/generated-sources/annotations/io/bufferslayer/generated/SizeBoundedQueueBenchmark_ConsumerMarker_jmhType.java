@@ -1,4 +1,0 @@
-package io.bufferslayer.generated;
-public class SizeBoundedQueueBenchmark_ConsumerMarker_jmhType extends SizeBoundedQueueBenchmark_ConsumerMarker_jmhType_B3 {
-}
-
