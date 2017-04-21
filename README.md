@@ -1,5 +1,7 @@
-# sqlbuffer
-Sqlbuffer is tool that buffers requests and send them in batch, of which sender supports batch operation. Such as `Spring-JdbcTemplate`(batchUpdate), `Redis`(pipeline).
+[![CircleCI](https://circleci.com/gh/tramchamploo/buffer-slayer.svg?style=svg)](https://circleci.com/gh/tramchamploo/buffer-slayer)
+
+# buffer-slayer
+buffer-slayer is tool that buffers requests and send them in batch, of which sender supports batch operation. Such as `Spring-JdbcTemplate`(batchUpdate), `Redis`(pipeline).
 
 It has a queue that allows multiple producers to send to, and it is also limited so to keep application away from Overflowing. 
 
