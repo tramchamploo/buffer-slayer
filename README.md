@@ -60,6 +60,14 @@ The query is forwarded to the delegated JdbcTemplate itself.
 The update directly goes to the reporter and returns a Promise.
 
 ### Quick-start
+```xml
+<dependency>
+  <groupId>io.bufferslayer</groupId>
+  <artifactId>buffer-spring-jdbc</artifactId>
+  <version>1.0.1</version>
+</dependency>
+```
+
 ```java
 ReporterProperties reporterProperties = new ReporterProperties()
         .setBufferedMaxMessages(500)
