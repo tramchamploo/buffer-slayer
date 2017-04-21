@@ -1,0 +1,4 @@
+package io.bufferslayer.generated;
+public class BatchedJdbcTemplateBenchmark_AtomicLongCounter_jmhType extends BatchedJdbcTemplateBenchmark_AtomicLongCounter_jmhType_B3 {
+}
+

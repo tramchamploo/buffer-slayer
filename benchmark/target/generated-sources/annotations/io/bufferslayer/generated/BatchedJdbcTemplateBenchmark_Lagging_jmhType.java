@@ -1,0 +1,4 @@
+package io.bufferslayer.generated;
+public class BatchedJdbcTemplateBenchmark_Lagging_jmhType extends BatchedJdbcTemplateBenchmark_Lagging_jmhType_B3 {
+}
+

@@ -1,0 +1,4 @@
+package io.bufferslayer.generated;
+public class SizeBoundedQueueBenchmark_DrainCounters_jmhType extends SizeBoundedQueueBenchmark_DrainCounters_jmhType_B3 {
+}
+

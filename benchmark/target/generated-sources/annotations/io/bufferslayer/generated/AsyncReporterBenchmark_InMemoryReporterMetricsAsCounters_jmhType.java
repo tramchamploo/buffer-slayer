@@ -1,0 +1,4 @@
+package io.bufferslayer.generated;
+public class AsyncReporterBenchmark_InMemoryReporterMetricsAsCounters_jmhType extends AsyncReporterBenchmark_InMemoryReporterMetricsAsCounters_jmhType_B3 {
+}
+

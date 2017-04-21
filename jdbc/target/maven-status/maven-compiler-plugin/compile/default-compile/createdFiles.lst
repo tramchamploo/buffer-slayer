@@ -1,0 +1,8 @@
+io/bufferslayer/BatchedJdbcTemplate.class
+io/bufferslayer/Sql$Builder.class
+io/bufferslayer/ArgTypePreparedStatementSetter.class
+io/bufferslayer/JdbcTemplateSender$1.class
+io/bufferslayer/Sql.class
+io/bufferslayer/ArgPreparedStatementSetter.class
+io/bufferslayer/JdbcTemplateSender.class
+io/bufferslayer/Sql$SqlKey.class
