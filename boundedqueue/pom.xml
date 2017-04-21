@@ -13,9 +13,8 @@
 
   <dependencies>
     <dependency>
-      <groupId>io.bufferslayer</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>core</artifactId>
-      <version>${project.version}</version>
     </dependency>
   </dependencies>
 
