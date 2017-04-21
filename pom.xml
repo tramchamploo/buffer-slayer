@@ -48,6 +48,14 @@
   <description>Buffer Slayer</description>
   <url>https://github.com/tramchamploo/buffer-slayer</url>
 
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
   <scm>
     <url>https://github.com/tramchamploo/buffer-slayer</url>
     <connection>scm:git:https://github.com/tramchamploo/buffer-slayer.git</connection>
@@ -55,6 +63,14 @@
     </developerConnection>
     <tag>HEAD</tag>
   </scm>
+
+  <distributionManagement>
+    <repository>
+      <id>bintray-repo-maven</id>
+      <name>tramchamploo</name>
+      <url>https://api.bintray.com/maven/tramchamploo/tramchamploo/buffer-slayer/;publish=1</url>
+    </repository>
+  </distributionManagement>
 
   <dependencyManagement>
     <dependencies>
