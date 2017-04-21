@@ -51,7 +51,7 @@
   <scm>
     <url>https://github.com/tramchamploo/buffer-slayer</url>
     <connection>scm:git:https://github.com/tramchamploo/buffer-slayer.git</connection>
-    <developerConnection>scm:git:https://github.com/tramchamploo/buffer-slayer.git
+    <developerConnection>scm:git:git@github.com:tramchamploo/buffer-slayer.git
     </developerConnection>
     <tag>HEAD</tag>
   </scm>
@@ -195,6 +195,16 @@
         </plugin>
       </plugins>
     </pluginManagement>
+
+    <plugins>
+      <plugin>
+        <artifactId>maven-release-plugin</artifactId>
+        <version>${maven-release-plugin.version}</version>
+        <configuration>
+          <autoVersionSubmodules>true</autoVersionSubmodules>
+        </configuration>
+      </plugin>
+    </plugins>
   </build>
 
   <profiles>
