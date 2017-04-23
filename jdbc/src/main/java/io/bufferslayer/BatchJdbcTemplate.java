@@ -31,43 +31,43 @@ import org.springframework.jdbc.support.rowset.SqlRowSet;
 /**
  * Created by guohang.bao on 2017/3/3.
  */
-public class BatchedJdbcTemplate {
+public class BatchJdbcTemplate {
 
   private final JdbcTemplate delegate;
   private final Reporter reporter;
 
   @VisibleForTesting
-  BatchedJdbcTemplate(JdbcTemplate delegate, Reporter reporter) {
+  BatchJdbcTemplate(JdbcTemplate delegate, Reporter reporter) {
     this.delegate = delegate;
     this.reporter = reporter;
   }
 
-  public BatchedJdbcTemplate() {
+  public BatchJdbcTemplate() {
     this.delegate = new JdbcTemplate();
     this.reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate)).build();
   }
 
-  public BatchedJdbcTemplate(DataSource dataSource) {
+  public BatchJdbcTemplate(DataSource dataSource) {
     this.delegate = new JdbcTemplate(dataSource);
     this.reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate)).build();
   }
 
-  public BatchedJdbcTemplate(DataSource dataSource, boolean lazyInit) {
+  public BatchJdbcTemplate(DataSource dataSource, boolean lazyInit) {
     this.delegate = new JdbcTemplate(dataSource, lazyInit);
     this.reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate)).build();
   }
 
-  public BatchedJdbcTemplate(ReporterProperties properties) {
+  public BatchJdbcTemplate(ReporterProperties properties) {
     this.delegate = new JdbcTemplate();
     this.reporter = properties.setSender(new JdbcTemplateSender(delegate)).toBuilder().build();
   }
 
-  public BatchedJdbcTemplate(DataSource dataSource, ReporterProperties properties) {
+  public BatchJdbcTemplate(DataSource dataSource, ReporterProperties properties) {
     this.delegate = new JdbcTemplate(dataSource);
     this.reporter = properties.setSender(new JdbcTemplateSender(delegate)).toBuilder().build();
   }
 
-  public BatchedJdbcTemplate(DataSource dataSource, boolean lazyInit, ReporterProperties properties) {
+  public BatchJdbcTemplate(DataSource dataSource, boolean lazyInit, ReporterProperties properties) {
     this.delegate = new JdbcTemplate(dataSource, lazyInit);
     this.reporter = properties.setSender(new JdbcTemplateSender(delegate)).toBuilder().build();
   }

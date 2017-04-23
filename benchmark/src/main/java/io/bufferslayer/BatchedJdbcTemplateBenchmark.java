@@ -39,8 +39,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class BatchedJdbcTemplateBenchmark {
 
   private ComboPooledDataSource dataSource;
-  private BatchedJdbcTemplate batched;
-  private JdbcTemplate unbatched;
+  private BatchJdbcTemplate batch;
+  private JdbcTemplate unbatch;
   private AsyncReporter reporter;
   private static SenderProxy proxy;
   private static AtomicLong counter = new AtomicLong();
@@ -68,19 +68,19 @@ public class BatchedJdbcTemplateBenchmark {
         .flushThreadKeepalive(1, TimeUnit.SECONDS)
         .strictOrder(true)
         .build();
-    batched = new BatchedJdbcTemplate(delegate, reporter);
-    batched.setDataSource(dataSource);
+    batch = new BatchJdbcTemplate(delegate, reporter);
+    batch.setDataSource(dataSource);
 
-    unbatched = new JdbcTemplate(dataSource);
-    unbatched.setDataSource(dataSource);
-    unbatched.update(DROP_TABLE);
-    unbatched.update(CREATE_TABLE);
+    unbatch = new JdbcTemplate(dataSource);
+    unbatch.setDataSource(dataSource);
+    unbatch.update(DROP_TABLE);
+    unbatch.update(CREATE_TABLE);
   }
 
   @TearDown(Level.Iteration)
   public void dropTable() {
     reporter.flush();
-    unbatched.update(TRUNCATE_TABLE);
+    unbatch.update(TRUNCATE_TABLE);
   }
 
   @AuxCounters
@@ -112,32 +112,32 @@ public class BatchedJdbcTemplateBenchmark {
 
   @Benchmark @Group("no_contention_batched") @GroupThreads(1)
   public void no_contention_batched_insert(Lagging l, AtomicLongCounter counters) {
-    batched.update(INSERTION, new Object[]{randomString(), new Date()});
+    batch.update(INSERTION, new Object[]{randomString(), new Date()});
   }
 
   @Benchmark @Group("no_contention_unbatched") @GroupThreads(1)
   public void no_contention_unbatched_insert(Lagging l) {
-    unbatched.update(INSERTION, new Object[]{randomString(), new Date()});
+    unbatch.update(INSERTION, new Object[]{randomString(), new Date()});
   }
 
   @Benchmark @Group("mild_contention_batched") @GroupThreads(2)
   public void mild_contention_batched_insert(Lagging l, AtomicLongCounter counters) {
-    batched.update(INSERTION, new Object[]{randomString(), new Date()});
+    batch.update(INSERTION, new Object[]{randomString(), new Date()});
   }
 
   @Benchmark @Group("mild_contention_unbatched") @GroupThreads(2)
   public void mild_contention_unbatched_insert(Lagging l) {
-    unbatched.update(INSERTION, new Object[]{randomString(), new Date()});
+    unbatch.update(INSERTION, new Object[]{randomString(), new Date()});
   }
 
   @Benchmark @Group("high_contention_batched") @GroupThreads(8)
   public void high_contention_batched_insert(Lagging l, AtomicLongCounter counters) {
-    batched.update(INSERTION, new Object[]{randomString(), new Date()});
+    batch.update(INSERTION, new Object[]{randomString(), new Date()});
   }
 
   @Benchmark @Group("high_contention_unbatched") @GroupThreads(8)
   public void high_contention_unbatched_insert(Lagging l) {
-    unbatched.update(INSERTION, new Object[]{randomString(), new Date()});
+    unbatch.update(INSERTION, new Object[]{randomString(), new Date()});
   }
 
   public static void main(String[] args) throws RunnerException {

@@ -17,8 +17,8 @@ public class TimeUsedComparison {
 
   public static void main(String[] args) throws PropertyVetoException, InterruptedException {
     ComboPooledDataSource dataSource;
-    BatchedJdbcTemplate batched;
-    JdbcTemplate unbatched;
+    BatchJdbcTemplate batch;
+    JdbcTemplate unbatch;
     SenderProxy proxy;
 
     dataSource = new ComboPooledDataSource();
@@ -53,40 +53,40 @@ public class TimeUsedComparison {
         .parallelismPerBatch(10)
         .strictOrder(true)
         .build();
-    batched = new BatchedJdbcTemplate(delegate, reporter);
-    batched.setDataSource(dataSource);
+    batch = new BatchJdbcTemplate(delegate, reporter);
+    batch.setDataSource(dataSource);
 
-    unbatched = new JdbcTemplate(dataSource);
-    unbatched.setDataSource(dataSource);
-    unbatched.update(DROP_TABLE);
-    unbatched.update(CREATE_TABLE);
+    unbatch = new JdbcTemplate(dataSource);
+    unbatch.setDataSource(dataSource);
+    unbatch.update(DROP_TABLE);
+    unbatch.update(CREATE_TABLE);
 
     Random random = new Random(System.currentTimeMillis());
 
     long start = System.nanoTime();
     for (int i = 0; i < 500000; i++) {
-      batched.update(INSERTION, new Object[] {randomString(), new Date()});
+      batch.update(INSERTION, new Object[] {randomString(), new Date()});
       if (i % 1000 == 0) {
-        batched.update(MODIFICATION, new Object[] {randomString(), random.nextInt(i + 1) + 1});
+        batch.update(MODIFICATION, new Object[] {randomString(), random.nextInt(i + 1) + 1});
       }
     }
     countDown.await();
     long used = System.nanoTime() - start;
-    System.out.println("batched time used: " + used);
+    System.out.println("batch time used: " + used);
 
-    unbatched.update(DROP_TABLE);
-    unbatched.update(CREATE_TABLE);
+    unbatch.update(DROP_TABLE);
+    unbatch.update(CREATE_TABLE);
     start = System.nanoTime();
     for (int i = 0; i < 500000; i++) {
-      unbatched.update(INSERTION, new Object[] {randomString(), new Date()});
+      unbatch.update(INSERTION, new Object[] {randomString(), new Date()});
       if (i % 1000 == 0) {
-        unbatched.update(MODIFICATION, new Object[] {randomString(), random.nextInt(i + 1) + 1});
+        unbatch.update(MODIFICATION, new Object[] {randomString(), random.nextInt(i + 1) + 1});
       }
     }
     used = System.nanoTime() - start;
-    System.out.println("unbatched time used: " + used);
+    System.out.println("unbatch time used: " + used);
     reporter.close();
-    unbatched.update(DROP_TABLE);
+    unbatch.update(DROP_TABLE);
   }
 
   static String randomString() {
