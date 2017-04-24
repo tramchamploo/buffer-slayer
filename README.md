@@ -1,4 +1,5 @@
 [![CircleCI](https://circleci.com/gh/tramchamploo/buffer-slayer.svg?style=svg)](https://circleci.com/gh/tramchamploo/buffer-slayer)
+[ ![Download](https://api.bintray.com/packages/tramchamploo/tramchamploo/buffer-slayer/images/download.svg) ](https://bintray.com/tramchamploo/tramchamploo/buffer-slayer/_latestVersion)
 
 # buffer-slayer
 buffer-slayer is tool that buffers requests and send them in batch, of which sender supports batch operation. Such as `Spring-JdbcTemplate`(batchUpdate), `Redis`(pipeline).
