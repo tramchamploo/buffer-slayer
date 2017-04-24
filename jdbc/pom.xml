@@ -17,6 +17,13 @@
 
     <dependency>
       <groupId>${project.groupId}</groupId>
+      <artifactId>bufferslayer-core</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>${project.groupId}</groupId>
       <artifactId>bufferslayer-boundedqueue</artifactId>
       <scope>provided</scope>
       <optional>true</optional>

@@ -21,7 +21,7 @@ public abstract class AbstractTimeUsedComparison {
   protected void run() throws Exception {
     BatchJdbcTemplate batch;
     JdbcTemplate unbatch;
-    SenderProxy proxy;
+    SenderProxy<Sql, Integer> proxy;
 
     DriverManagerDataSource dataSource = new DriverManagerDataSource();
     dataSource.setDriverClassName("com.mysql.jdbc.Driver");
@@ -42,7 +42,7 @@ public abstract class AbstractTimeUsedComparison {
 
     CountDownLatch countDown = new CountDownLatch(1);
 
-    proxy = new SenderProxy(new JdbcTemplateSender(delegate));
+    proxy = new SenderProxy<>(new JdbcTemplateSender(delegate));
     proxy.onMessages(updated -> {
       if (counter.addAndGet(updated.size()) == 5050) {
         countDown.countDown();

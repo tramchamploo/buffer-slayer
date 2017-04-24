@@ -1,0 +1,19 @@
+machine:
+  java:
+    version: oraclejdk8
+  services:
+    - redis
+
+dependencies:
+  pre:
+    - openssl aes-256-cbc -d -in .buildscript/secret-env-cipher -k $KEY >> ~/.circlerc
+  override:
+    - mvn --fail-never dependency:go-offline || true
+  cache_directories:
+    - "~/.m2"
+
+test:
+  post:
+    - mkdir -p $CIRCLE_TEST_REPORTS/junit/
+    - find . -type f -regex ".*/target/surefire-reports/.*xml" -exec cp {} $CIRCLE_TEST_REPORTS/junit/ \;
+    - .buildscript/release.sh

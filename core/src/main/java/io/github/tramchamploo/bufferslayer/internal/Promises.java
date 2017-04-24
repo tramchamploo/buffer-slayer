@@ -6,6 +6,7 @@ import com.google.common.base.Preconditions;
 import io.github.tramchamploo.bufferslayer.Message;
 import io.github.tramchamploo.bufferslayer.MessageDroppedException;
 import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -19,7 +20,12 @@ public final class Promises {
     for (int i = 0; i < result.size(); i++) {
       MessagePromise<R> promise = promises.get(i);
       R ret = result.get(i);
-      promise.setSuccess(ret);
+      if (ret instanceof Throwable) {
+        promise.setFailure(MessageDroppedException.dropped((Throwable) ret,
+            Collections.singletonList(promise.message())));
+      } else {
+        promise.setSuccess(ret);
+      }
     }
   }
 
