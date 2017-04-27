@@ -78,10 +78,14 @@ public class AsyncReporterTest {
         .build();
     reporter.report(newMessage(0));
 
+    assertEquals(1, reporter.flushThreadCount());
+
     countDown.await(50, TimeUnit.MILLISECONDS);
     // messageTimeout + flushThreadKeepalive
     Thread.sleep(TimeUnit.MILLISECONDS.toMillis(20));
     assertEquals(0, reporter.pendings.size());
+    assertEquals(0, reporter.flushThreadCount()); // should remove dead thread
+    assertEquals(0, reporter.flushThreads.size());
   }
 
   @Test
