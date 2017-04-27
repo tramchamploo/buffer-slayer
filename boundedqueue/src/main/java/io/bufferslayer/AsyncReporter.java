@@ -11,7 +11,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.bufferslayer.OverflowStrategy.Strategy;
 import io.bufferslayer.internal.Component;
 import java.io.Flushable;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -176,14 +175,11 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     }
   }
 
-  public int flushThreadCount() {
+  int flushThreadCount() {
     int c = 0;
-    for (Iterator<Thread> iter = flushThreads.iterator(); iter.hasNext(); ) {
-      if (iter.next().isAlive()) {
-        c++;
-      } else {
-        iter.remove();
-      }
+    for (Thread flushThread : flushThreads) {
+      if (flushThread.isAlive()) c++;
+      else flushThreads.remove(flushThread);
     }
     return c;
   }
