@@ -8,17 +8,18 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * Created by guohang.bao on 2017/2/28.
  */
-public class InMemoryReporterMetrics extends ReporterMetrics {
+public class InMemoryReporterMetrics<QueueKey> extends ReporterMetrics<QueueKey> {
 
   enum MetricKey {
     messages,
-    messagesDropped,
-    queuedMessages
+    messagesDropped
   }
 
   private static InMemoryReporterMetrics instance;
 
-  private final ConcurrentHashMap<MetricKey, AtomicLong> metrics = new ConcurrentHashMap<>();
+  final ConcurrentHashMap<MetricKey, AtomicLong> metrics = new ConcurrentHashMap<>();
+  final ConcurrentHashMap<QueueKey, AtomicLong> queuedMessages = new ConcurrentHashMap<>();
+
   private final Lock lock = new ReentrantLock();
 
   private InMemoryReporterMetrics(ReporterMetricsExporter exporter) {
@@ -90,17 +91,21 @@ public class InMemoryReporterMetrics extends ReporterMetrics {
 
   @Override
   public long queuedMessages() {
-    return get(MetricKey.queuedMessages);
+    long count = 0;
+    for (AtomicLong queued: queuedMessages.values()) {
+      count += queued.get();
+    }
+    return count;
   }
 
-  private void update(MetricKey key, int update) {
-    AtomicLong metric = metrics.get(key);
+  private void update(QueueKey key, int update) {
+    AtomicLong metric = queuedMessages.get(key);
     if (metric == null) {
       try {
         lock.lock();
-        metric = metrics.get(key);
+        metric = queuedMessages.get(key);
         if (metric == null) {
-          metrics.put(key, new AtomicLong(update));
+          queuedMessages.put(key, new AtomicLong(update));
           return;
         }
       } finally {
@@ -111,11 +116,17 @@ public class InMemoryReporterMetrics extends ReporterMetrics {
   }
 
   @Override
-  public void updateQueuedMessages(int quantity) {
-    update(MetricKey.queuedMessages, quantity);
+  public void updateQueuedMessages(QueueKey key, int quantity) {
+    update(key, quantity);
+  }
+
+  @Override
+  public void removeQueuedMessages(QueueKey queueKey) {
+    queuedMessages.remove(queueKey);
   }
 
   public void clear() {
     metrics.clear();
+    queuedMessages.clear();
   }
 }

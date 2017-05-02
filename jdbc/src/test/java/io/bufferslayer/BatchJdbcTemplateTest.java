@@ -3,7 +3,6 @@ package io.bufferslayer;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import com.mchange.v2.c3p0.ComboPooledDataSource;
 import java.sql.Types;
 import java.util.Date;
 import java.util.HashSet;
@@ -23,6 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.core.PreparedStatementCreatorFactory;
 import org.springframework.jdbc.core.SqlParameter;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /**
  * Created by guohang.bao on 2017/3/29.
@@ -32,7 +32,7 @@ public class BatchJdbcTemplateTest {
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
-  private static ComboPooledDataSource dataSource;
+  private static DriverManagerDataSource dataSource;
   private BatchJdbcTemplate batchJdbcTemplate;
   private JdbcTemplate delegate;
   private AsyncReporter reporter;
@@ -49,11 +49,9 @@ public class BatchJdbcTemplateTest {
 
   @BeforeClass
   public static void init() throws Exception {
-    dataSource = new ComboPooledDataSource();
-    dataSource.setDriverClass("org.h2.Driver");
-    dataSource.setMinPoolSize(10);
-    dataSource.setMaxPoolSize(50);
-    dataSource.setJdbcUrl("jdbc:h2:~/test");
+    dataSource = new DriverManagerDataSource();
+    dataSource.setDriverClassName("org.h2.Driver");
+    dataSource.setUrl("jdbc:h2:~/test");
   }
 
   @Before
@@ -81,7 +79,10 @@ public class BatchJdbcTemplateTest {
     for (int i = 0; i < 100; i++) {
       batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()});
     }
-    reporter.flush();
+
+    for (int i = 0; i < 100 / 10; i++) {
+      reporter.flush();
+    }
     int rowCount = batchJdbcTemplate.queryForObject(ROW_COUNT, Integer.class);
 
     assertEquals(100, rowCount);
@@ -107,12 +108,17 @@ public class BatchJdbcTemplateTest {
     String lastRowData = randomString();
     batchJdbcTemplate.update(INSERTION, new Object[]{lastRowData, new Date()});
 
-    reporter.flush();
+    // 4 batches for 2 insertions and one for modification and one for single insertion
+    for (int i = 0; i < 8 / 2 + 1 + 1; i++) {
+      reporter.flush();
+    }
+
     int distinct = batchJdbcTemplate
         .queryForObject("SELECT COUNT(DISTINCT(data)) FROM test;", Integer.class);
     assertEquals(2, distinct);
 
-    List<Map<String, Object>> datas = batchJdbcTemplate.queryForList("SELECT DISTINCT(data) FROM test;");
+    List<Map<String, Object>> datas = batchJdbcTemplate
+        .queryForList("SELECT DISTINCT(data) FROM test;");
     Set<String> unordered = new HashSet<>();
     for (Map<String, Object> data: datas) {
       unordered.add((String) data.get("data"));

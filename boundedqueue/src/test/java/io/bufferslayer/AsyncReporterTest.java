@@ -190,6 +190,9 @@ public class AsyncReporterTest {
     reporter.report(newMessage(0));
 
     reporter.flush();
+    assertEquals(1, metrics.queuedMessages());
+
+    reporter.flush();
     assertEquals(0, metrics.queuedMessages());
   }
 
@@ -313,5 +316,27 @@ public class AsyncReporterTest {
     iter = reporter.flushThreads.iterator();
     assertTrue(iter.hasNext());
     assertEquals("AsyncReporter-1-flush-thread-0", iter.next().getName());
+  }
+
+  @Test
+  public void closeShouldRemoveMetrics() throws InterruptedException {
+    FakeSender sender = new FakeSender();
+
+    reporter = AsyncReporter.builder(sender)
+        .metrics(metrics)
+        .flushThreadKeepalive(10, TimeUnit.MILLISECONDS)
+        .build();
+
+    CountDownLatch countDown = new CountDownLatch(1);
+    Promise<Object, MessageDroppedException, Integer> promise = reporter.report(newMessage(0));
+    promise.done(d -> {
+      assertEquals(1, metrics.queuedMessages.size());
+      countDown.countDown();
+    });
+    countDown.await();
+    reporter.flush();
+
+    reporter.close();
+    assertEquals(0, metrics.queuedMessages.size());
   }
 }

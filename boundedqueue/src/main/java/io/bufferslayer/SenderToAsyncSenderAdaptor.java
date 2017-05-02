@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import org.jdeferred.Deferred;
 import org.jdeferred.DeferredManager;
 import org.jdeferred.Promise;
@@ -68,6 +69,9 @@ abstract class SenderToAsyncSenderAdaptor<M extends Message, R> implements Async
 
   @Override
   public void close() throws IOException {
+    if (executor instanceof ExecutorService) {
+      ((ExecutorService) executor).shutdown();
+    }
     delegate.close();
   }
 }
