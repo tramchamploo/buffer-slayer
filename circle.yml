@@ -3,16 +3,11 @@ machine:
     version: oraclejdk8
 
 dependencies:
+  pre:
+    - openssl aes-256-cbc -d -in .buildscript/secret-env-cipher -k $KEY >> ~/.circlerc
   override:
     - mvn --fail-never dependency:go-offline || true
 
 test:
   post:
-    - if [[ $GIT_USER_EMAIL ]]; then git config --global user.email "$GIT_USER_EMAIL" ; fi
-    - if [[ $GIT_USER_NAME ]]; then git config --global user.name "$GIT_USER_NAME" ; fi
-    - |
-      if [[ $RELEASE ]] ; then \
-        mvn -B release:prepare -DreleaseVersion=$RELEASE -DdevelopmentVersion=$NEXT -DskipTests ; \
-        mvn -B release:perform ; \
-      fi ; \
-      sed -i "s/<version>\(.*\)</<version>$RELEASE</" README.md
+    - .buildscript/release.sh
