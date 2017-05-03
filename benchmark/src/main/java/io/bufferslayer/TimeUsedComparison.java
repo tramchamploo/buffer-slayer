@@ -1,31 +1,38 @@
 package io.bufferslayer;
 
-import com.mchange.v2.c3p0.ComboPooledDataSource;
-import java.beans.PropertyVetoException;
 import java.util.Date;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /**
  * Created by guohang.bao on 2017/3/30.
  */
 public class TimeUsedComparison {
 
-  public static void main(String[] args) throws PropertyVetoException, InterruptedException {
-    ComboPooledDataSource dataSource;
+  static String randomString() {
+    return String.valueOf(ThreadLocalRandom.current().nextLong());
+  }
+
+  static String envOr(String key, String fallback) {
+    return System.getenv(key) != null ? System.getenv(key) : fallback;
+  }
+
+  public static void main(String[] args) throws Exception {
     BatchJdbcTemplate batch;
     JdbcTemplate unbatch;
     SenderProxy proxy;
 
-    dataSource = new ComboPooledDataSource();
-    dataSource.setDriverClass("org.h2.Driver");
-    dataSource.setMinPoolSize(10);
-    dataSource.setMaxPoolSize(50);
-    dataSource.setJdbcUrl("jdbc:h2:~/test");
+    DriverManagerDataSource dataSource = new DriverManagerDataSource();
+    dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+    dataSource.setUrl(envOr("jdbcUrl", "jdbc:mysql://192.168.99.100:32772/test?useSSL=false"));
+    dataSource.setUsername(envOr("username", "root"));
+    dataSource.setPassword(envOr("password", "root"));
 
     JdbcTemplate delegate = new JdbcTemplate(dataSource);
     delegate.setDataSource(dataSource);
@@ -41,14 +48,16 @@ public class TimeUsedComparison {
 
     proxy = new SenderProxy(new JdbcTemplateSender(delegate));
     proxy.onMessages(updated -> {
-      if (counter.addAndGet(updated.size()) == 500500) {
+      if (counter.addAndGet(updated.size()) == 5050) {
         countDown.countDown();
       }
     });
 
     AsyncReporter reporter = AsyncReporter.builder(proxy)
-        .pendingMaxMessages(6000000)
-        .bufferedMaxMessages(1000)
+        .pendingMaxMessages(6000)
+        .bufferedMaxMessages(100)
+        .messageTimeout(50, TimeUnit.MILLISECONDS)
+        .flushThreadKeepalive(10, TimeUnit.MILLISECONDS)
         .senderExecutor(Executors.newCachedThreadPool())
         .parallelismPerBatch(10)
         .strictOrder(true)
@@ -64,32 +73,29 @@ public class TimeUsedComparison {
     Random random = new Random(System.currentTimeMillis());
 
     long start = System.nanoTime();
-    for (int i = 0; i < 500000; i++) {
+    for (int i = 0; i < 5000; i++) {
       batch.update(INSERTION, new Object[] {randomString(), new Date()});
-      if (i % 1000 == 0) {
+      if (i % 100 == 0) {
         batch.update(MODIFICATION, new Object[] {randomString(), random.nextInt(i + 1) + 1});
       }
     }
     countDown.await();
     long used = System.nanoTime() - start;
     System.out.println("batch time used: " + used);
+    reporter.sender.close();
+    reporter.close();
 
     unbatch.update(DROP_TABLE);
     unbatch.update(CREATE_TABLE);
     start = System.nanoTime();
-    for (int i = 0; i < 500000; i++) {
+    for (int i = 0; i < 5000; i++) {
       unbatch.update(INSERTION, new Object[] {randomString(), new Date()});
-      if (i % 1000 == 0) {
+      if (i % 100 == 0) {
         unbatch.update(MODIFICATION, new Object[] {randomString(), random.nextInt(i + 1) + 1});
       }
     }
     used = System.nanoTime() - start;
     System.out.println("unbatch time used: " + used);
-    reporter.close();
     unbatch.update(DROP_TABLE);
-  }
-
-  static String randomString() {
-    return String.valueOf(ThreadLocalRandom.current().nextLong());
   }
 }

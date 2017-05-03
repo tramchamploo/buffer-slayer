@@ -46,8 +46,8 @@ public class AsyncReporter implements Reporter, Flushable, Component {
   static AtomicLong idGenerator = new AtomicLong();
   private final Long id = idGenerator.getAndIncrement();
 
-  private final AsyncSender sender;
-  private final ReporterMetrics metrics;
+  final AsyncSender sender;
+  private final ReporterMetrics<SizeBoundedQueue> metrics;
 
   private final long messageTimeoutNanos;
   private final long flushThreadKeepaliveNanos;
@@ -66,6 +66,7 @@ public class AsyncReporter implements Reporter, Flushable, Component {
   private final ThreadFactory flushThreadFactory;
   private ScheduledExecutorService flushThreadsMonitor;
 
+  @SuppressWarnings("unchecked")
   private AsyncReporter(Builder builder) {
     this.sender = new DefaultSenderToAsyncSenderAdaptor(builder.sender,
         builder.senderExecutor, builder.parallelismPerBatch);
@@ -244,8 +245,8 @@ public class AsyncReporter implements Reporter, Flushable, Component {
         long lastDrained = System.nanoTime();
         try {
           while (!closed.get()) {
-            // check if exceeds keepAlive
-            if (!strictOrder && flushThreadKeepaliveNanos > 0 &&
+            if (!strictOrder && // check if exceeds keepAlive
+                flushThreadKeepaliveNanos > 0 &&
                 System.nanoTime() - lastDrained >= flushThreadKeepaliveNanos) {
               return;
             }
@@ -255,20 +256,18 @@ public class AsyncReporter implements Reporter, Flushable, Component {
             }
           }
         } finally {
-          // flush messages left in queue
-          for (Message message : consumer.drain()) {
+          for (Message message : consumer.drain()) { // flush messages left in queue
             pending.offer(message, DeferredHolder.newDeferred(message.id));
           }
           flushTillEmpty(pending);
-          // remove queue from pendings
-          pendings.remove(key);
-          // wake up notice thread
-          if (closed.get()) {
-            close.countDown();
-          }
+
+          pendings.remove(key); // remove queue from pendings
+          metrics.removeQueuedMessages(pending); // remove metrics
+          if (closed.get()) close.countDown(); // wake up notice thread
         }
       }
     });
+
     flushThread.start();
     return flushThread;
   }
@@ -282,14 +281,16 @@ public class AsyncReporter implements Reporter, Flushable, Component {
   @Override
   public void flush() {
     for (SizeBoundedQueue pending : pendings.values()) {
-      flushTillEmpty(pending);
+      BufferNextMessage rightNow =
+          new BufferNextMessage(bufferedMaxMessages, 0, strictOrder);
+      flush(pending, rightNow);
     }
   }
 
   @SuppressWarnings("unchecked")
   int flush(SizeBoundedQueue pending, BufferNextMessage consumer) {
     int drainedCount = pending.drainTo(consumer, consumer.remainingNanos());
-    metrics.updateQueuedMessages(pending.count);
+    metrics.updateQueuedMessages(pending, pending.count);
 
     if (!consumer.isReady()) {
       return drainedCount;
@@ -338,7 +339,6 @@ public class AsyncReporter implements Reporter, Flushable, Component {
   public void close() {
     close = new CountDownLatch(messageTimeoutNanos > 0 ? flushThreads.size() : 0);
     closed.set(true);
-    if (flushThreadsMonitor != null) flushThreadsMonitor.shutdown();
     try {
       if (!close.await(messageTimeoutNanos, TimeUnit.NANOSECONDS)) {
         logger.warn("Timed out waiting for close");
@@ -347,6 +347,8 @@ public class AsyncReporter implements Reporter, Flushable, Component {
       logger.warn("Interrupted waiting for close");
       Thread.currentThread().interrupt();
     }
+
+    if (flushThreadsMonitor != null) flushThreadsMonitor.shutdown();
 
     int count = 0;
     for (SizeBoundedQueue pending : pendings.values()) {

@@ -1,7 +1,7 @@
 package io.bufferslayer;
 
-import com.mchange.v2.c3p0.ComboPooledDataSource;
 import java.beans.PropertyVetoException;
+import java.io.IOException;
 import java.util.Date;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -26,6 +26,7 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /**
  * Created by guohang.bao on 2017/3/16.
@@ -38,7 +39,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @State(Scope.Group)
 public class BatchedJdbcTemplateBenchmark {
 
-  private ComboPooledDataSource dataSource;
+  private DriverManagerDataSource dataSource;
   private BatchJdbcTemplate batch;
   private JdbcTemplate unbatch;
   private AsyncReporter reporter;
@@ -50,13 +51,17 @@ public class BatchedJdbcTemplateBenchmark {
   private static final String TRUNCATE_TABLE = "TRUNCATE TABLE benchmark;";
   private static final String INSERTION = "INSERT INTO benchmark(data, time) VALUES(?, ?);";
 
+  static String envOr(String key, String fallback) {
+    return System.getenv(key) != null ? System.getenv(key) : fallback;
+  }
+
   @Setup
   public void setup() throws PropertyVetoException {
-    dataSource = new ComboPooledDataSource();
-    dataSource.setDriverClass("org.h2.Driver");
-    dataSource.setMinPoolSize(10);
-    dataSource.setMaxPoolSize(50);
-    dataSource.setJdbcUrl("jdbc:h2:~/benchmark");
+    dataSource = new DriverManagerDataSource();
+    dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+    dataSource.setUrl(envOr("jdbcUrl", "jdbc:mysql://192.168.99.100:32772/test?useSSL=false"));
+    dataSource.setUsername(envOr("username", "root"));
+    dataSource.setPassword(envOr("password", "root"));
 
     JdbcTemplate delegate = new JdbcTemplate(dataSource);
     delegate.setDataSource(dataSource);
@@ -79,7 +84,9 @@ public class BatchedJdbcTemplateBenchmark {
 
   @TearDown(Level.Iteration)
   public void dropTable() {
-    reporter.flush();
+    for (SizeBoundedQueue pending : reporter.pendings.values()) {
+      pending.doClear();
+    }
     unbatch.update(TRUNCATE_TABLE);
   }
 
