@@ -19,7 +19,8 @@ public class ReporterProperties {
   private String metrics = "noop";
   private Exporters metricsExporter = Exporters.noop;
   private long messageTimeoutNanos = TimeUnit.SECONDS.toNanos(1);
-  private long flushThreadKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
+  private long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
+  private int flushThreadCount = 5;
   private int bufferedMaxMessages = 100;
   private int pendingMaxMessages = 10000;
   private boolean strictOrder = false;
@@ -73,12 +74,21 @@ public class ReporterProperties {
     return this;
   }
 
-  public long getFlushThreadKeepaliveNanos() {
-    return flushThreadKeepaliveNanos;
+  public long getPendingKeepaliveNanos() {
+    return pendingKeepaliveNanos;
   }
 
-  public ReporterProperties setFlushThreadKeepaliveNanos(long flushThreadKeepalive, TimeUnit unit) {
-    this.flushThreadKeepaliveNanos = unit.toNanos(flushThreadKeepalive);
+  public ReporterProperties setPendingKeepaliveNanos(long pendingKeepalive, TimeUnit unit) {
+    this.pendingKeepaliveNanos = unit.toNanos(pendingKeepalive);
+    return this;
+  }
+
+  public int getFlushThreadCount() {
+    return flushThreadCount;
+  }
+
+  public ReporterProperties setFlushThreadCount(int flushThreadCount) {
+    this.flushThreadCount = flushThreadCount;
     return this;
   }
 
@@ -138,7 +148,8 @@ public class ReporterProperties {
         .senderExecutor(senderExecutor)
         .parallelismPerBatch(parallelismPerBatch)
         .messageTimeout(messageTimeoutNanos, TimeUnit.NANOSECONDS)
-        .flushThreadKeepalive(flushThreadKeepaliveNanos, TimeUnit.NANOSECONDS)
+        .pendingKeepalive(pendingKeepaliveNanos, TimeUnit.NANOSECONDS)
+        .flushThreadCount(flushThreadCount)
         .bufferedMaxMessages(bufferedMaxMessages)
         .pendingMaxMessages(pendingMaxMessages)
         .strictOrder(strictOrder)

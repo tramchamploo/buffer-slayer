@@ -44,7 +44,7 @@ public class AsyncReporterTest {
     reporter.report(newMessage(0));
 
     assertFalse(countDown.await(50, TimeUnit.MILLISECONDS));
-    assertTrue(countDown.await(100, TimeUnit.MILLISECONDS));
+    assertTrue(countDown.await(60, TimeUnit.MILLISECONDS));
     assertEquals(0, sender.sent.get(0).key);
   }
 
@@ -61,86 +61,54 @@ public class AsyncReporterTest {
         .messageTimeout(Integer.MAX_VALUE, TimeUnit.SECONDS)
         .build();
     reporter.report(newMessage(0));
-    countDown.await(50, TimeUnit.MILLISECONDS);
+    countDown.await(10, TimeUnit.MILLISECONDS);
     assertEquals(0, sender.sent.get(0).key);
   }
 
   @Test
-  public void flushThreadDieAfterKeepAlive() throws InterruptedException {
+  public void differentMessagesHaveDifferentPendingQueue() throws InterruptedException {
     FakeSender sender = new FakeSender();
-    CountDownLatch countDown = new CountDownLatch(1);
-    sender.onMessages(m -> countDown.countDown());
 
     reporter = AsyncReporter.builder(sender)
         .metrics(metrics)
-        .messageTimeout(10, TimeUnit.MILLISECONDS)
-        .flushThreadKeepalive(1, TimeUnit.MILLISECONDS)
-        .build();
-    reporter.report(newMessage(0));
-
-    assertEquals(1, reporter.flushThreadCount());
-
-    countDown.await(50, TimeUnit.MILLISECONDS);
-    // messageTimeout + flushThreadKeepalive
-    Thread.sleep(TimeUnit.MILLISECONDS.toMillis(20));
-    assertEquals(0, reporter.pendings.size());
-    assertEquals(0, reporter.flushThreadCount()); // should remove dead thread
-    assertEquals(0, reporter.flushThreads.size());
-  }
-
-  @Test
-  public void differentMessagesHaveDifferentFlushThreads() throws InterruptedException {
-    FakeSender sender = new FakeSender();
-    CountDownLatch countDown = new CountDownLatch(1);
-    sender.onMessages(m -> countDown.countDown());
-
-    reporter = AsyncReporter.builder(sender)
-        .metrics(metrics)
-        .messageTimeout(10, TimeUnit.MILLISECONDS)
-        .flushThreadKeepalive(1, TimeUnit.SECONDS)
+        .messageTimeout(0, TimeUnit.MILLISECONDS)
+        .pendingKeepalive(1, TimeUnit.SECONDS)
         .build();
     reporter.report(newMessage(0));
     reporter.report(newMessage(1));
 
-    countDown.await(50, TimeUnit.MILLISECONDS);
-    assertEquals(2, reporter.flushThreads.size());
+    assertEquals(2, reporter.pendingRecycler.bySize.size());
   }
 
   @Test
   public void strictOrdered_differentMessagesShareTheSameFlushThread() throws InterruptedException {
     FakeSender sender = new FakeSender();
-    CountDownLatch countDown = new CountDownLatch(1);
-    sender.onMessages(m -> countDown.countDown());
 
     reporter = AsyncReporter.builder(sender)
         .metrics(metrics)
-        .messageTimeout(10, TimeUnit.MILLISECONDS)
-        .flushThreadKeepalive(1, TimeUnit.SECONDS)
+        .messageTimeout(0, TimeUnit.MILLISECONDS)
+        .pendingKeepalive(1, TimeUnit.SECONDS)
         .strictOrder(true)
         .build();
     reporter.report(newMessage(0));
     reporter.report(newMessage(1));
 
-    countDown.await(50, TimeUnit.MILLISECONDS);
-    assertEquals(1, reporter.flushThreads.size());
+    assertEquals(1, reporter.pendingRecycler.bySize.size());
   }
 
   @Test
   public void sameMessagesHaveShareTheSameFlushThread() throws InterruptedException {
     FakeSender sender = new FakeSender();
-    CountDownLatch countDown = new CountDownLatch(1);
-    sender.onMessages(m -> countDown.countDown());
 
     reporter = AsyncReporter.builder(sender)
         .metrics(metrics)
-        .messageTimeout(10, TimeUnit.MILLISECONDS)
-        .flushThreadKeepalive(1, TimeUnit.SECONDS)
+        .messageTimeout(0, TimeUnit.MILLISECONDS)
+        .pendingKeepalive(1, TimeUnit.SECONDS)
         .build();
     reporter.report(newMessage(0));
     reporter.report(newMessage(0));
 
-    countDown.await(50, TimeUnit.MILLISECONDS);
-    assertEquals(1, reporter.flushThreads.size());
+    assertEquals(1, reporter.pendingRecycler.bySize.size());
   }
 
   @Test
@@ -151,7 +119,7 @@ public class AsyncReporterTest {
         .metrics(metrics)
         .pendingMaxMessages(1)
         .messageTimeout(0, TimeUnit.MILLISECONDS)
-        .flushThreadKeepalive(1, TimeUnit.SECONDS)
+        .pendingKeepalive(1, TimeUnit.SECONDS)
         .build();
     reporter.report(newMessage(0));
     reporter.report(newMessage(0));
@@ -167,7 +135,7 @@ public class AsyncReporterTest {
     reporter = AsyncReporter.builder(sender)
         .metrics(metrics)
         .messageTimeout(0, TimeUnit.MILLISECONDS)
-        .flushThreadKeepalive(1, TimeUnit.SECONDS)
+        .pendingKeepalive(1, TimeUnit.SECONDS)
         .build();
     reporter.report(newMessage(0));
     reporter.report(newMessage(0));
@@ -324,7 +292,7 @@ public class AsyncReporterTest {
 
     reporter = AsyncReporter.builder(sender)
         .metrics(metrics)
-        .flushThreadKeepalive(10, TimeUnit.MILLISECONDS)
+        .messageTimeout(0, TimeUnit.MILLISECONDS)
         .build();
 
     CountDownLatch countDown = new CountDownLatch(1);
@@ -333,8 +301,8 @@ public class AsyncReporterTest {
       assertEquals(1, metrics.queuedMessages.size());
       countDown.countDown();
     });
-    countDown.await();
     reporter.flush();
+    countDown.await();
 
     reporter.close();
     assertEquals(0, metrics.queuedMessages.size());
