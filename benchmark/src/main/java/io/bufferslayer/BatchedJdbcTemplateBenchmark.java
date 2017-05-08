@@ -1,7 +1,6 @@
 package io.bufferslayer;
 
 import java.beans.PropertyVetoException;
-import java.io.IOException;
 import java.util.Date;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -46,22 +45,23 @@ public class BatchedJdbcTemplateBenchmark {
   private static SenderProxy proxy;
   private static AtomicLong counter = new AtomicLong();
 
-  private static final String CREATE_TABLE = "CREATE TABLE benchmark(id INT PRIMARY KEY AUTO_INCREMENT, data VARCHAR(32), time TIMESTAMP);";
-  private static final String DROP_TABLE = "DROP TABLE IF EXISTS benchmark;";
-  private static final String TRUNCATE_TABLE = "TRUNCATE TABLE benchmark;";
-  private static final String INSERTION = "INSERT INTO benchmark(data, time) VALUES(?, ?);";
+  private static final String CREATE_DATABASE = "CREATE DATABASE IF NOT EXISTS test";
+  private static final String CREATE_TABLE = "CREATE TABLE test.benchmark(id INT PRIMARY KEY AUTO_INCREMENT, data VARCHAR(32), time TIMESTAMP);";
+  private static final String DROP_TABLE = "DROP TABLE IF EXISTS test.benchmark;";
+  private static final String TRUNCATE_TABLE = "TRUNCATE TABLE test.benchmark;";
+  private static final String INSERTION = "INSERT INTO test.benchmark(data, time) VALUES(?, ?);";
 
-  static String envOr(String key, String fallback) {
-    return System.getenv(key) != null ? System.getenv(key) : fallback;
+  static String propertyOr(String key, String fallback) {
+    return System.getProperty(key, fallback);
   }
 
   @Setup
   public void setup() throws PropertyVetoException {
     dataSource = new DriverManagerDataSource();
     dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
-    dataSource.setUrl(envOr("jdbcUrl", "jdbc:mysql://192.168.99.100:32772/test?useSSL=false"));
-    dataSource.setUsername(envOr("username", "root"));
-    dataSource.setPassword(envOr("password", "root"));
+    dataSource.setUrl(propertyOr("jdbcUrl", "jdbc:mysql://127.0.0.1:3306?useSSL=false"));
+    dataSource.setUsername(propertyOr("username", "root"));
+    dataSource.setPassword(propertyOr("password", "root"));
 
     JdbcTemplate delegate = new JdbcTemplate(dataSource);
     delegate.setDataSource(dataSource);
@@ -70,7 +70,7 @@ public class BatchedJdbcTemplateBenchmark {
     proxy.onMessages(updated -> counter.addAndGet(updated.size()));
 
     reporter = AsyncReporter.builder(proxy)
-        .flushThreadKeepalive(1, TimeUnit.SECONDS)
+        .pendingKeepalive(1, TimeUnit.SECONDS)
         .strictOrder(true)
         .build();
     batch = new BatchJdbcTemplate(delegate, reporter);
@@ -78,13 +78,14 @@ public class BatchedJdbcTemplateBenchmark {
 
     unbatch = new JdbcTemplate(dataSource);
     unbatch.setDataSource(dataSource);
+    unbatch.update(CREATE_DATABASE);
     unbatch.update(DROP_TABLE);
     unbatch.update(CREATE_TABLE);
   }
 
   @TearDown(Level.Iteration)
   public void dropTable() {
-    for (SizeBoundedQueue pending : reporter.pendings.values()) {
+    for (SizeBoundedQueue pending : reporter.pendingRecycler.elements()) {
       pending.doClear();
     }
     unbatch.update(TRUNCATE_TABLE);

@@ -11,20 +11,16 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.bufferslayer.OverflowStrategy.Strategy;
 import io.bufferslayer.internal.Component;
 import java.io.Flushable;
+import java.util.Collection;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import org.jdeferred.Deferred;
 import org.jdeferred.DoneCallback;
 import org.jdeferred.FailCallback;
@@ -50,21 +46,21 @@ public class AsyncReporter implements Reporter, Flushable, Component {
   private final ReporterMetrics<SizeBoundedQueue> metrics;
 
   private final long messageTimeoutNanos;
-  private final long flushThreadKeepaliveNanos;
   private final int bufferedMaxMessages;
-  private final int pendingMaxMessages;
+
   private final boolean strictOrder;
   private final Strategy overflowStrategy;
 
-  final Map<Message.MessageKey, SizeBoundedQueue> pendings;
-  private final Lock pendingsLock;
+  private final int pendingMaxMessages;
+  private final long pendingKeepaliveNanos;
+  final SizeFirstQueueRecycler pendingRecycler;
+
+  private final int flushThreadCount;
+  private final ThreadFactory flushThreadFactory;
+  final CopyOnWriteArraySet<Thread> flushThreads = new CopyOnWriteArraySet<>();
 
   final AtomicBoolean closed = new AtomicBoolean(false);
   CountDownLatch close;
-
-  final CopyOnWriteArraySet<Thread> flushThreads = new CopyOnWriteArraySet<>();
-  private final ThreadFactory flushThreadFactory;
-  private ScheduledExecutorService flushThreadsMonitor;
 
   @SuppressWarnings("unchecked")
   private AsyncReporter(Builder builder) {
@@ -74,29 +70,25 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     this.metrics = builder.metrics;
 
     this.messageTimeoutNanos = builder.messageTimeoutNanos;
-    this.flushThreadKeepaliveNanos = builder.flushThreadKeepaliveNanos;
     this.bufferedMaxMessages = builder.bufferedMaxMessages;
-
-    this.pendingMaxMessages = builder.pendingMaxMessages;
-    this.pendings = new ConcurrentHashMap<>();
-    this.pendingsLock = new ReentrantLock();
 
     this.strictOrder = builder.strictOrder;
     this.overflowStrategy = builder.overflowStrategy;
 
+    this.pendingMaxMessages = builder.pendingMaxMessages;
+    this.pendingKeepaliveNanos = builder.pendingKeepaliveNanos;
+    this.pendingRecycler = new SizeFirstQueueRecycler(pendingMaxMessages, overflowStrategy,
+        pendingKeepaliveNanos);
+
+    this.flushThreadCount = builder.flushThreadCount;
     flushThreadFactory = new ThreadFactoryBuilder()
         .setNameFormat("AsyncReporter-" + id + "-flush-thread-%d")
         .setDaemon(true)
         .build();
-
-    if (!strictOrder && messageTimeoutNanos > 0) {
-      flushThreadsMonitor = Executors.newSingleThreadScheduledExecutor();
-      flushThreadsMonitor.scheduleAtFixedRate(new Runnable() {
-        @Override
-        public void run() {
-          logger.info("AsyncReporter-{} flush thread count: {}", id, flushThreadCount());
-        }
-      }, 0, 5, TimeUnit.SECONDS);
+    if (messageTimeoutNanos > 0) {
+      for (int i = 0; i < flushThreadCount; i++) {
+        flushThreads.add(startFlushThread(flushThreadFactory));
+      }
     }
   }
 
@@ -110,9 +102,10 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     int parallelismPerBatch = 1;
     ReporterMetrics metrics = ReporterMetrics.NOOP_METRICS;
     long messageTimeoutNanos = TimeUnit.SECONDS.toNanos(1);
-    long flushThreadKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
     int bufferedMaxMessages = 100;
     int pendingMaxMessages = 10000;
+    int flushThreadCount = 5;
+    long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
     boolean strictOrder = false;
     Strategy overflowStrategy = DropHead;
 
@@ -143,12 +136,6 @@ public class AsyncReporter implements Reporter, Flushable, Component {
       return this;
     }
 
-    public Builder flushThreadKeepalive(long keepalive, TimeUnit unit) {
-      checkArgument(keepalive > 0, "keepalive > 0: %s", keepalive);
-      this.flushThreadKeepaliveNanos = unit.toNanos(keepalive);
-      return this;
-    }
-
     public Builder bufferedMaxMessages(int bufferedMaxMessages) {
       checkArgument(bufferedMaxMessages > 0, "bufferedMaxMessages > 0: %s", bufferedMaxMessages);
       this.bufferedMaxMessages = bufferedMaxMessages;
@@ -158,6 +145,18 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     public Builder pendingMaxMessages(int pendingMaxMessages) {
       checkArgument(pendingMaxMessages > 0, "pendingMaxMessages > 0: %s", pendingMaxMessages);
       this.pendingMaxMessages = pendingMaxMessages;
+      return this;
+    }
+
+    public Builder flushThreadCount(int flushThreadCount) {
+      checkArgument(flushThreadCount > 0, "flushThreadCount > 0: %s", flushThreadCount);
+      this.flushThreadCount = flushThreadCount;
+      return this;
+    }
+
+    public Builder pendingKeepalive(long keepalive, TimeUnit unit) {
+      checkArgument(keepalive > 0, "keepalive > 0: %s", keepalive);
+      this.pendingKeepaliveNanos = unit.toNanos(keepalive);
       return this;
     }
 
@@ -176,35 +175,53 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     }
   }
 
-  int flushThreadCount() {
-    int c = 0;
-    for (Thread flushThread : flushThreads) {
-      if (flushThread.isAlive()) c++;
-      else flushThreads.remove(flushThread);
-    }
-    return c;
+  private SizeBoundedQueue leaseQueue() {
+    return pendingRecycler.lease(messageTimeoutNanos, TimeUnit.NANOSECONDS);
   }
 
-  private SizeBoundedQueue getOrInitializePendingQueue(Message.MessageKey key) {
-    key = strictOrder ? Message.STRICT_ORDER : key;
-    SizeBoundedQueue pending = pendings.get(key);
-    if (pending == null) {
-      // race condition initializing pending queue
-      try {
-        pendingsLock.lock();
-        pending = pendings.get(key);
-        if (pending == null) {
-          pending = new SizeBoundedQueue(pendingMaxMessages, overflowStrategy);
-          pendings.put(key, pending);
-          if (messageTimeoutNanos > 0) {
-            flushThreads.add(startFlushThread(key, pending));
+  private void clearMetrics(Collection<SizeBoundedQueue> queues) {
+    for (SizeBoundedQueue queue: queues) {
+      metrics.removeQueuedMessages(queue);
+    }
+  }
+
+  private Thread startFlushThread(final ThreadFactory threadFactory) {
+    final BufferNextMessage consumer =
+        new BufferNextMessage(bufferedMaxMessages, messageTimeoutNanos, strictOrder);
+    Thread flushThread = threadFactory.newThread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          while (!closed.get()) {
+            SizeBoundedQueue q = leaseQueue();
+            if (q == null) continue;
+            try {
+              flush(q, consumer);
+              LinkedList<SizeBoundedQueue> shrink = pendingRecycler.shrink();
+              clearMetrics(shrink);
+            } finally {
+              pendingRecycler.recycle(q);
+            }
+          }
+        } finally {
+          // flush messages left in buffer
+          List<Message> drained = consumer.drain();
+          SizeBoundedQueue q;
+          if (drained.size() > 0 && (q = leaseQueue()) != null) {
+            for (Message message : drained) {
+              q.offer(message, DeferredHolder.newDeferred(message.id));
+            }
+            flushTillEmpty(q);
+          }
+          if (closed.get()) { // wake up notice thread
+            close.countDown();
           }
         }
-      } finally {
-        pendingsLock.unlock();
       }
-    }
-    return pending;
+    });
+
+    flushThread.start();
+    return flushThread;
   }
 
   @Override
@@ -219,7 +236,8 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     }
 
     Message.MessageKey key = message.asMessageKey();
-    SizeBoundedQueue pending = getOrInitializePendingQueue(key);
+    key = strictOrder ? Message.STRICT_ORDER : key;
+    SizeBoundedQueue pending = pendingRecycler.getOrCreate(key);
 
     Deferred<Object, MessageDroppedException, Integer> deferred =
         DeferredHolder.newDeferred(message.id);
@@ -236,69 +254,58 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     };
   }
 
-  private Thread startFlushThread(final Message.MessageKey key, final SizeBoundedQueue pending) {
-    final BufferNextMessage consumer =
-        new BufferNextMessage(bufferedMaxMessages, messageTimeoutNanos, strictOrder);
-    final Thread flushThread = flushThreadFactory.newThread(new Runnable() {
-      @Override
-      public void run() {
-        long lastDrained = System.nanoTime();
-        try {
-          while (!closed.get()) {
-            if (!strictOrder && // check if exceeds keepAlive
-                flushThreadKeepaliveNanos > 0 &&
-                System.nanoTime() - lastDrained >= flushThreadKeepaliveNanos) {
-              return;
-            }
-            int drainedCount = flush(pending, consumer);
-            if (!strictOrder && drainedCount > 0) {
-              lastDrained = System.nanoTime();
-            }
-          }
-        } finally {
-          for (Message message : consumer.drain()) { // flush messages left in queue
-            pending.offer(message, DeferredHolder.newDeferred(message.id));
-          }
-          flushTillEmpty(pending);
-
-          pendings.remove(key); // remove queue from pendings
-          metrics.removeQueuedMessages(pending); // remove metrics
-          if (closed.get()) close.countDown(); // wake up notice thread
-        }
-      }
-    });
-
-    flushThread.start();
-    return flushThread;
-  }
-
   void flushTillEmpty(SizeBoundedQueue pending) {
     BufferNextMessage rightNow =
         new BufferNextMessage(bufferedMaxMessages, 0, strictOrder);
-    while (pending.count > 0) flush(pending, rightNow);
+    while (pending.count > 0) {
+      flush(pending, rightNow);
+    }
   }
 
   @Override
   public void flush() {
-    for (SizeBoundedQueue pending : pendings.values()) {
+    for (SizeBoundedQueue pending : pendingRecycler.elements()) {
       BufferNextMessage rightNow =
           new BufferNextMessage(bufferedMaxMessages, 0, strictOrder);
       flush(pending, rightNow);
     }
   }
 
+  /**
+   * @return flushed count
+   */
   @SuppressWarnings("unchecked")
   int flush(SizeBoundedQueue pending, BufferNextMessage consumer) {
-    int drainedCount = pending.drainTo(consumer, consumer.remainingNanos());
-    metrics.updateQueuedMessages(pending, pending.count);
-
-    if (!consumer.isReady()) {
-      return drainedCount;
+    int total = 0;
+    do {
+      int drained = pending.drainTo(consumer, consumer.remainingNanos());
+      metrics.updateQueuedMessages(pending, pending.count);
+      total += drained;
+      if (drained == 0) {
+        break;
+      }
+    } while (!consumer.isReady());
+    if (total == 0) {
+      return total;
     }
 
     final List<Message> messages = consumer.drain();
     Promise<MultipleResults, OneReject, MasterProgress> promise = sender.send(messages);
+    addCallbacks(messages, promise);
+    try {
+      promise.waitSafely();
+      if (promise.isResolved()) {
+        return total;
+      }
+    } catch (InterruptedException e) {
+      logger.error("Interrupted flushing messages");
+      Thread.currentThread().interrupt();
+    }
+    return 0;
+  }
 
+  private void addCallbacks(final List<Message> messages,
+      Promise<MultipleResults, OneReject, MasterProgress> promise) {
     promise.done(new DoneCallback<MultipleResults>() {
       @Override
       public void onDone(MultipleResults result) {
@@ -310,14 +317,6 @@ public class AsyncReporter implements Reporter, Flushable, Component {
         DeferredHolder.batchReject(messages, (MessageDroppedException) reject.getReject());
       }
     }).fail(loggingCallback());
-    try {
-      promise.waitSafely();
-      if (promise.isResolved()) return drainedCount;
-    } catch (InterruptedException e) {
-      logger.error("Interrupted flushing messages");
-      Thread.currentThread().interrupt();
-    }
-    return 0;
   }
 
   private FailCallback<OneReject> loggingCallback() {
@@ -337,7 +336,7 @@ public class AsyncReporter implements Reporter, Flushable, Component {
 
   @Override
   public void close() {
-    close = new CountDownLatch(messageTimeoutNanos > 0 ? flushThreads.size() : 0);
+    close = new CountDownLatch(messageTimeoutNanos > 0 ? flushThreadCount : 0);
     closed.set(true);
     try {
       if (!close.await(messageTimeoutNanos, TimeUnit.NANOSECONDS)) {
@@ -348,15 +347,15 @@ public class AsyncReporter implements Reporter, Flushable, Component {
       Thread.currentThread().interrupt();
     }
 
-    if (flushThreadsMonitor != null) flushThreadsMonitor.shutdown();
-
     int count = 0;
-    for (SizeBoundedQueue pending : pendings.values()) {
-      count += pending.clear();
+    for (SizeBoundedQueue q : pendingRecycler.elements()) {
+      count += q.clear();
+      clearMetrics(singletonList(q));
     }
     if (count > 0) {
       metrics.incrementMessagesDropped(count);
       logger.warn("Dropped " + count + " messages due to AsyncReporter.close()");
     }
+    pendingRecycler.clear();
   }
 }

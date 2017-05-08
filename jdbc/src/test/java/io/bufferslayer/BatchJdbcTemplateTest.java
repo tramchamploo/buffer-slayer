@@ -171,14 +171,15 @@ public class BatchJdbcTemplateTest {
     reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
         .pendingMaxMessages(2)
         .bufferedMaxMessages(2)
-        .flushThreadKeepalive(10, TimeUnit.SECONDS)
+        .messageTimeout(50, TimeUnit.MILLISECONDS)
+        .pendingKeepalive(10, TimeUnit.SECONDS)
         .build();
     batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
 
     for (int i = 0; i < 2; i++) {
       batchJdbcTemplate.update("INSERT INTO test(data, time) VALUES ('data', now())");
     }
-    assertEquals(1, reporter.flushThreadCount());
+    assertEquals(1, reporter.pendingRecycler.elements().size());
 
     Thread.sleep(1000);
     int rowCount = batchJdbcTemplate.queryForObject("SELECT COUNT(1) FROM test;", Integer.class);
@@ -190,14 +191,14 @@ public class BatchJdbcTemplateTest {
     reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
         .pendingMaxMessages(2)
         .bufferedMaxMessages(2)
-        .flushThreadKeepalive(10, TimeUnit.SECONDS)
+        .pendingKeepalive(10, TimeUnit.SECONDS)
         .build();
     batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
 
     for (int i = 0; i < 2; i++) {
       batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()});
     }
-    assertEquals(1, reporter.flushThreadCount());
+    assertEquals(1, reporter.pendingRecycler.elements().size());
   }
 
   @Test
@@ -205,13 +206,13 @@ public class BatchJdbcTemplateTest {
     reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
         .pendingMaxMessages(2)
         .bufferedMaxMessages(2)
-        .flushThreadKeepalive(10, TimeUnit.SECONDS)
+        .pendingKeepalive(10, TimeUnit.SECONDS)
         .build();
     batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
 
     batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()});
     batchJdbcTemplate.update(MODIFICATION, new Object[]{randomString()});
-    assertEquals(2, reporter.flushThreadCount());
+    assertEquals(2, reporter.pendingRecycler.elements().size());
   }
 
   @Test
