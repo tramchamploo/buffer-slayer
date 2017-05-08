@@ -64,6 +64,7 @@ public class BatchJdbcTemplateTest {
 
   @After
   public void clean() {
+    reporter.flush();
     reporter.close();
   }
 
@@ -132,7 +133,7 @@ public class BatchJdbcTemplateTest {
     FakeSender sender = new FakeSender();
     RuntimeException ex = new RuntimeException();
     sender.onMessages(messages -> { throw ex; });
-    reporter = AsyncReporter.builder(sender).build();
+    reporter = AsyncReporter.builder(sender).messageTimeout(10, TimeUnit.MILLISECONDS).build();
     batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
 
     CountDownLatch countDown = new CountDownLatch(1);
@@ -146,7 +147,9 @@ public class BatchJdbcTemplateTest {
 
   @Test
   public void chainedDeferred() throws InterruptedException {
-    reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate)).build();
+    reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
+        .messageTimeout(10, TimeUnit.MILLISECONDS)
+        .build();
     batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
 
     CountDownLatch countDown = new CountDownLatch(1);
@@ -187,11 +190,12 @@ public class BatchJdbcTemplateTest {
   }
 
   @Test
-  public void samePreparedStatementUseSameFlushThread() {
+  public void samePreparedStatementUseSameQueue() {
     reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
         .pendingMaxMessages(2)
         .bufferedMaxMessages(2)
-        .pendingKeepalive(10, TimeUnit.SECONDS)
+        .pendingKeepalive(1, TimeUnit.SECONDS)
+        .messageTimeout(10, TimeUnit.MILLISECONDS)
         .build();
     batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
 
@@ -202,11 +206,12 @@ public class BatchJdbcTemplateTest {
   }
 
   @Test
-  public void differentPreparedStatementUseDifferentFlushThreads() {
+  public void differentPreparedStatementUseDifferentQueue() {
     reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
         .pendingMaxMessages(2)
         .bufferedMaxMessages(2)
-        .pendingKeepalive(10, TimeUnit.SECONDS)
+        .pendingKeepalive(1, TimeUnit.SECONDS)
+        .messageTimeout(10, TimeUnit.MILLISECONDS)
         .build();
     batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
 
