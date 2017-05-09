@@ -78,17 +78,8 @@ final class SizeFirstQueueRecycler implements QueueRecycler {
 
   @Override
   public SizeBoundedQueue lease(long timeout, TimeUnit unit) {
-    long start = now();
     try {
-      SizeBoundedQueue queue = bySize.poll(timeout, unit);
-      while (queue != null && queue.count == 0 &&
-          !keyToQueue.values().contains(queue)) { // skip the dead ones
-        long elapsed = now() - start;
-        long timeoutNanos = unit.toNanos(timeout);
-        if (elapsed >= timeoutNanos) return null;
-        queue = bySize.poll(timeoutNanos - elapsed, TimeUnit.NANOSECONDS);
-      }
-      return queue;
+      return bySize.poll(timeout, unit);
     } catch (InterruptedException e) {
       logger.error("Interrupted leasing queue.", e);
     }
@@ -97,7 +88,8 @@ final class SizeFirstQueueRecycler implements QueueRecycler {
 
   @Override
   public void recycle(SizeBoundedQueue queue) {
-    if (queue != null) {
+    if (queue != null && // offer only when not dead
+        (keyToQueue.containsValue(queue) || queue.count > 0)) {
       bySize.offer(queue);
     }
   }
