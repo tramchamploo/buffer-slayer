@@ -45,7 +45,7 @@ The update directly goes to the reporter and returns a Promise.
 <dependency>
   <groupId>io.bufferslayer</groupId>
   <artifactId>buffer-spring-jdbc</artifactId>
-  <version>1.1.0</version>
+  <version>1.1.1</version>
 </dependency>
 ```
 
