@@ -1,5 +1,6 @@
 package io.bufferslayer;
 
+import static io.bufferslayer.OverflowStrategy.Strategy.Block;
 import static io.bufferslayer.OverflowStrategy.Strategy.DropBuffer;
 import static io.bufferslayer.OverflowStrategy.Strategy.DropHead;
 import static io.bufferslayer.OverflowStrategy.Strategy.DropNew;
@@ -27,6 +28,8 @@ public abstract class OverflowStrategy {
       return DropBuffer;
     } else if (name.equals(DropNew.name().toLowerCase())) {
       return DropNew;
+    } else if (name.equals(Block.name().toLowerCase())) {
+      return Block;
     } else if (name.equals(Fail.name().toLowerCase())) {
       return Fail;
     }
@@ -34,7 +37,7 @@ public abstract class OverflowStrategy {
   }
 
   enum Strategy {
-    DropHead, DropTail, DropBuffer, DropNew, Fail
+    DropHead, DropTail, DropBuffer, DropNew, Block, Fail
   }
 
   /**
@@ -60,7 +63,12 @@ public abstract class OverflowStrategy {
   public static final Strategy dropNew = Strategy.DropNew;
 
   /**
-   * If the buffer is full when a new element is available this strategy throws an exception.
+   * If the buffer is full when a new element is arrives, blocks the caller thread.
+   */
+  public static final Strategy block = Strategy.Block;
+
+  /**
+   * If the buffer is full when a new element arrives, throws an exception.
    */
   public static final Strategy fail = Strategy.Fail;
 }

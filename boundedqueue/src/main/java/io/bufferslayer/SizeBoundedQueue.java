@@ -1,5 +1,8 @@
 package io.bufferslayer;
 
+import static io.bufferslayer.MessageDroppedException.dropped;
+import static io.bufferslayer.OverflowStrategy.Strategy.*;
+
 import io.bufferslayer.OverflowStrategy.Strategy;
 import java.util.Arrays;
 import java.util.LinkedList;
@@ -27,7 +30,8 @@ final class SizeBoundedQueue {
   }
 
   final ReentrantLock lock = new ReentrantLock(false);
-  final Condition available = lock.newCondition();
+  final Condition notEmpty = lock.newCondition();
+  final Condition notFull = lock.newCondition();
 
   final int maxSize;
   final Strategy overflowStrategy;
@@ -48,11 +52,12 @@ final class SizeBoundedQueue {
    */
   Message dropTail() {
     if (--writePos == -1) {
-      writePos = elements.length - 1; // circle foward to the end dropped the array
+      writePos = elements.length - 1; // circle forward to the end of the array
     }
     Message tail = elements[writePos];
     elements[writePos] = null;
     count--;
+    notFull.signal();
     return tail;
   }
 
@@ -63,21 +68,28 @@ final class SizeBoundedQueue {
     Message head = elements[readPos];
     elements[readPos] = null;
     if (++readPos == elements.length) {
-      readPos = 0; // circle back to the front dropped the array
+      readPos = 0; // circle back to the front of the array
     }
     count--;
+    notFull.signal();
     return head;
   }
 
   void enqueue(Message next) {
-    elements[writePos++] = next;
+    try {
+      while (isFull()) {
+        notFull.await();
+      }
+      elements[writePos++] = next;
 
-    if (writePos == elements.length) {
-      writePos = 0; // circle back to the front dropped the array
+      if (writePos == elements.length) {
+        writePos = 0; // circle back to the front of the array
+      }
+
+      count++;
+      notEmpty.signal(); // alert any drainers
+    } catch (InterruptedException e) {
     }
-
-    count++;
-    available.signal(); // alert any drainers
   }
 
   boolean isFull() {
@@ -94,27 +106,29 @@ final class SizeBoundedQueue {
       if (isFull()) {
         switch (overflowStrategy) {
           case DropNew:
-            DeferredHolder.reject(MessageDroppedException.dropped(Strategy.DropNew, next));
+            DeferredHolder.reject(dropped(DropNew, next));
             return;
           case DropTail:
             Message tail = dropTail();
             enqueue(next);
             deferred.notify(1);
-            DeferredHolder.reject(MessageDroppedException.dropped(Strategy.DropTail, tail));
+            DeferredHolder.reject(dropped(DropTail, tail));
             return;
           case DropHead:
             Message head = dropHead();
             enqueue(next);
             deferred.notify(1);
-            DeferredHolder.reject(MessageDroppedException.dropped(Strategy.DropHead, head));
+            DeferredHolder.reject(dropped(DropHead, head));
             return;
           case DropBuffer:
             List<Message> allElements = allElements();
             doClear();
             enqueue(next);
             deferred.notify(1);
-            DeferredHolder.reject(MessageDroppedException.dropped(Strategy.DropBuffer, allElements));
+            DeferredHolder.reject(dropped(DropBuffer, allElements));
             return;
+          case Block:
+            break;
           case Fail:
             throw new BufferOverflowException("Max size of " + count + " is reached.");
         }
@@ -140,7 +154,7 @@ final class SizeBoundedQueue {
           if (nanosLeft <= 0) {
             return 0;
           }
-          nanosLeft = available.awaitNanos(nanosLeft);
+          nanosLeft = notEmpty.awaitNanos(nanosLeft);
         }
         return doDrain(consumer);
       } finally {
@@ -155,6 +169,9 @@ final class SizeBoundedQueue {
     int result = count;
     count = readPos = writePos = 0;
     Arrays.fill(elements, null);
+    for (int i = result; i > 0 && lock.hasWaiters(notFull); i--) {
+      notFull.signal();
+    }
     return result;
   }
 
@@ -201,6 +218,9 @@ final class SizeBoundedQueue {
       }
     }
     count -= drainedCount;
+    for (int i = drainedCount; i > 0 && lock.hasWaiters(notFull); i--) {
+      notFull.signal();
+    }
     return drainedCount;
   }
 }

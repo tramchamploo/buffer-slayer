@@ -9,6 +9,7 @@ import static org.junit.Assert.assertTrue;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.jdeferred.Deferred;
@@ -145,6 +146,25 @@ public class SizeBoundedQueueTest {
 
     Object[] ids = collectKeys(queue);
     assertArrayEquals(new Object[]{10}, ids);
+  }
+
+  @Test
+  public void blockCallerWhenFull_blockStrategy() throws InterruptedException {
+    SizeBoundedQueue queue = new SizeBoundedQueue(10, OverflowStrategy.block);
+    for (int i = 0; i < queue.maxSize; i++) {
+      TestMessage next = newMessage(i);
+      queue.offer(next, newDeferred(next));
+    }
+
+    CountDownLatch countDown = new CountDownLatch(1);
+    new Thread(() -> {
+      TestMessage shouldBlock = newMessage(10);
+      queue.offer(shouldBlock, newDeferred(shouldBlock));
+      countDown.countDown();
+    }).start();
+    assertFalse(countDown.await(1, TimeUnit.MILLISECONDS));
+    queue.drainTo(next -> true, 0);
+    assertTrue(countDown.await(1, TimeUnit.MILLISECONDS));
   }
 
   @Test
