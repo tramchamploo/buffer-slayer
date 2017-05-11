@@ -97,6 +97,7 @@ A queue that bounded by a specific size. Supports multi producers in parallel. I
 * `DropTail`: drops the youngest element
 * `DropBuffer`: drops all the buffered elements
 * `DropNew`: drops the new element
+* `Block`: block offer thread, this can be used as a simple back-pressure strategy
 * `Fail`: throws an exception
 
 Strategies above are inspired by Akka stream. 

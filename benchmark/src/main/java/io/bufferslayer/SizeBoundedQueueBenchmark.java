@@ -2,7 +2,6 @@ package io.bufferslayer;
 
 import java.util.concurrent.TimeUnit;
 import org.jdeferred.Deferred;
-import org.jdeferred.impl.DeferredObject;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -33,40 +32,42 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @OutputTimeUnit(TimeUnit.SECONDS)
 @State(Scope.Group)
 public class SizeBoundedQueueBenchmark {
-  static Message message = TestMessage.newMessage(0);
 
-  static int offersFailed;
-  static int offersMade;
+  static Deferred<?, MessageDroppedException, Integer> newDeferred(long id) {
+    return DeferredHolder.newDeferred(id);
+  }
 
-  static Deferred<?, MessageDroppedException, Integer> newDeferred() {
-    return new DeferredObject<>();
+  static Message newMessage() {
+    return TestMessage.newMessage(0);
+  }
+
+  @State(Scope.Thread)
+  public static class Factory {
+    Deferred<?, MessageDroppedException, Integer> deferred = null;
+    Message message = null;
+
+    @Setup(Level.Invocation)
+    public void setup() {
+      message = newMessage();
+      deferred = newDeferred(message.id);
+    }
   }
 
   @AuxCounters
   @State(Scope.Thread)
   public static class OfferCounters {
+    public int offersMade;
+    public int offersFailed;
 
-    Deferred<?, MessageDroppedException, Integer> deferred = newDeferred();
-
-    public int offersMade() {
-      return offersMade;
-    }
-
-    public int offersFailed() {
-      return offersFailed;
+    public void addCallback(Deferred<?, ?, ?> deferred) {
+      deferred.promise()
+          .progress(i -> offersMade += 1)
+          .fail(f -> offersFailed += 1);
     }
 
     @Setup(Level.Iteration)
     public void clean() {
       offersFailed = offersMade = 0;
-    }
-
-    @Setup(Level.Invocation)
-    public void setup() {
-      deferred = newDeferred();
-      deferred.promise()
-          .progress(count -> offersMade += count)
-          .fail(ex -> offersFailed += 1);
     }
   }
 
@@ -94,7 +95,7 @@ public class SizeBoundedQueueBenchmark {
 
   @Setup
   public void setup() {
-    q = new SizeBoundedQueue(10000, OverflowStrategy.dropNew);
+    q = new SizeBoundedQueue(10000, OverflowStrategy.block);
   }
 
   @TearDown(Level.Iteration)
@@ -104,42 +105,47 @@ public class SizeBoundedQueueBenchmark {
     q.clear();
   }
 
-  @Benchmark
-  @Group("no_contention") @GroupThreads(1)
-  public void no_contention_offer(OfferCounters counters) {
-    q.offer(message, counters.deferred);
+  @Benchmark @Group("no_contention") @GroupThreads(1)
+  public void no_contention_offer(OfferCounters counters, Factory factory) {
+    counters.addCallback(factory.deferred);
+    q.offer(factory.message, factory.deferred);
   }
 
   @Benchmark @Group("no_contention") @GroupThreads(1)
   public void no_contention_drain(DrainCounters counters, ConsumerMarker cm) {
-    q.drainTo(buffer -> {
+    q.drainTo(next -> {
       counters.drained++;
+      DeferredHolder.resolve(next.id, null);
       return true;
     }, 1000);
   }
 
   @Benchmark @Group("mild_contention") @GroupThreads(2)
-  public void mild_contention_offer(OfferCounters counters) {
-    q.offer(message, counters.deferred);
+  public void mild_contention_offer(OfferCounters counters, Factory factory) {
+    counters.addCallback(factory.deferred);
+    q.offer(factory.message, factory.deferred);
   }
 
   @Benchmark @Group("mild_contention") @GroupThreads(1)
   public void mild_contention_drain(DrainCounters counters, ConsumerMarker cm) {
-    q.drainTo(buffer -> {
+    q.drainTo(next -> {
       counters.drained++;
+      DeferredHolder.resolve(next.id, null);
       return true;
     }, 1000);
   }
 
   @Benchmark @Group("high_contention") @GroupThreads(8)
-  public void high_contention_offer(OfferCounters counters) {
-    q.offer(message, counters.deferred);
+  public void high_contention_offer(OfferCounters counters, Factory factory) {
+    counters.addCallback(factory.deferred);
+    q.offer(factory.message, factory.deferred);
   }
 
   @Benchmark @Group("high_contention") @GroupThreads(1)
   public void high_contention_drain(DrainCounters counters, ConsumerMarker cm) {
-    q.drainTo(buffer -> {
+    q.drainTo(next -> {
       counters.drained++;
+      DeferredHolder.resolve(next.id, null);
       return true;
     }, 1000);
   }
