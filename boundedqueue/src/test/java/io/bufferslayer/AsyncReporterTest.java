@@ -77,7 +77,7 @@ public class AsyncReporterTest {
     reporter.report(newMessage(0));
     reporter.report(newMessage(1));
 
-    assertEquals(2, reporter.pendingRecycler.bySize.size());
+    assertEquals(2, reporter.pendingRecycler.elements().size());
   }
 
   @Test
@@ -93,7 +93,7 @@ public class AsyncReporterTest {
     reporter.report(newMessage(0));
     reporter.report(newMessage(1));
 
-    assertEquals(1, reporter.pendingRecycler.bySize.size());
+    assertEquals(1, reporter.pendingRecycler.elements().size());
   }
 
   @Test
@@ -108,7 +108,7 @@ public class AsyncReporterTest {
     reporter.report(newMessage(0));
     reporter.report(newMessage(0));
 
-    assertEquals(1, reporter.pendingRecycler.bySize.size());
+    assertEquals(1, reporter.pendingRecycler.elements().size());
   }
 
   @Test
@@ -305,6 +305,25 @@ public class AsyncReporterTest {
     countDown.await();
 
     reporter.close();
+    assertEquals(0, metrics.queuedMessages.size());
+  }
+
+  @Test
+  public void flushShouldClearOvertimeMetrics() throws InterruptedException {
+    FakeSender sender = new FakeSender();
+
+    reporter = AsyncReporter.builder(sender)
+        .metrics(metrics)
+        .messageTimeout(0, TimeUnit.MILLISECONDS)
+        .pendingKeepalive(10, TimeUnit.MILLISECONDS)
+        .build();
+
+    reporter.report(newMessage(0));
+    reporter.flush();
+    assertEquals(1, metrics.queuedMessages.size());
+
+    Thread.sleep(10);
+    reporter.flush();
     assertEquals(0, metrics.queuedMessages.size());
   }
 }

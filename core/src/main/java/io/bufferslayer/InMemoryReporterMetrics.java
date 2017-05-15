@@ -1,5 +1,6 @@
 package io.bufferslayer;
 
+import io.bufferslayer.Message.MessageKey;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
@@ -8,7 +9,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * Created by guohang.bao on 2017/2/28.
  */
-public class InMemoryReporterMetrics<QueueKey> extends ReporterMetrics<QueueKey> {
+public class InMemoryReporterMetrics extends ReporterMetrics {
 
   enum MetricKey {
     messages,
@@ -18,7 +19,7 @@ public class InMemoryReporterMetrics<QueueKey> extends ReporterMetrics<QueueKey>
   private static InMemoryReporterMetrics instance;
 
   final ConcurrentHashMap<MetricKey, AtomicLong> metrics = new ConcurrentHashMap<>();
-  final ConcurrentHashMap<QueueKey, AtomicLong> queuedMessages = new ConcurrentHashMap<>();
+  final ConcurrentHashMap<MessageKey, AtomicLong> queuedMessages = new ConcurrentHashMap<>();
 
   private final Lock lock = new ReentrantLock();
 
@@ -98,30 +99,26 @@ public class InMemoryReporterMetrics<QueueKey> extends ReporterMetrics<QueueKey>
     return count;
   }
 
-  private void update(QueueKey key, int update) {
+  @Override
+  public void updateQueuedMessages(MessageKey key, int quantity) {
     AtomicLong metric = queuedMessages.get(key);
     if (metric == null) {
       try {
         lock.lock();
         metric = queuedMessages.get(key);
         if (metric == null) {
-          queuedMessages.put(key, new AtomicLong(update));
+          queuedMessages.put(key, new AtomicLong(quantity));
           return;
         }
       } finally {
         lock.unlock();
       }
     }
-    metric.set(update);
+    metric.set(quantity);
   }
 
   @Override
-  public void updateQueuedMessages(QueueKey key, int quantity) {
-    update(key, quantity);
-  }
-
-  @Override
-  public void removeQueuedMessages(QueueKey queueKey) {
+  public void removeQueuedMessages(MessageKey queueKey) {
     queuedMessages.remove(queueKey);
   }
 

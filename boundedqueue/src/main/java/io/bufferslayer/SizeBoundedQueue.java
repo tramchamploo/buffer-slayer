@@ -3,6 +3,8 @@ package io.bufferslayer;
 import static io.bufferslayer.MessageDroppedException.dropped;
 import static io.bufferslayer.OverflowStrategy.Strategy.*;
 
+import com.google.common.annotations.VisibleForTesting;
+import io.bufferslayer.Message.MessageKey;
 import io.bufferslayer.OverflowStrategy.Strategy;
 import java.util.Arrays;
 import java.util.LinkedList;
@@ -37,14 +39,22 @@ final class SizeBoundedQueue {
   final Strategy overflowStrategy;
 
   final Message[] elements;
+  final MessageKey key;
+
   int count;
   int writePos;
   int readPos;
 
-  SizeBoundedQueue(int maxSize, Strategy overflowStrategy) {
+  SizeBoundedQueue(int maxSize, Strategy overflowStrategy, MessageKey key) {
     this.elements = new Message[maxSize];
     this.maxSize = maxSize;
     this.overflowStrategy = overflowStrategy;
+    this.key = key;
+  }
+
+  // Used for testing
+  SizeBoundedQueue(int maxSize, Strategy overflowStrategy) {
+    this(maxSize, overflowStrategy, Message.STRICT_ORDER);
   }
 
   /**

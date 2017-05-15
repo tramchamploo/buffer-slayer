@@ -36,7 +36,7 @@ public abstract class Message implements Serializable {
 
     @Override
     public boolean equals(Object obj) {
-      return false;
+      return this == obj;
     }
   };
 

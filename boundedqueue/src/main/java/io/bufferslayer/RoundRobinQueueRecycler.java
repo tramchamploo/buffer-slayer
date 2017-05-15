@@ -3,12 +3,10 @@ package io.bufferslayer;
 import io.bufferslayer.Message.MessageKey;
 import io.bufferslayer.OverflowStrategy.Strategy;
 import java.util.Collection;
-import java.util.Comparator;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -18,34 +16,26 @@ import org.slf4j.LoggerFactory;
 /**
  * Created by guohang.bao on 2017/5/4.
  */
-final class SizeFirstQueueRecycler implements QueueRecycler {
+final class RoundRobinQueueRecycler implements QueueRecycler {
 
-  private static final Logger logger = LoggerFactory.getLogger(SizeFirstQueueRecycler.class);
+  private static final Logger logger = LoggerFactory.getLogger(RoundRobinQueueRecycler.class);
 
   final Map<MessageKey, SizeBoundedQueue> keyToQueue;
   final Map<MessageKey, Long> keyToLastGet;
 
-  final PriorityBlockingQueue<SizeBoundedQueue> bySize;
+  final LinkedBlockingQueue<SizeBoundedQueue> roundRobin;
   final int pendingMaxMessages;
   final Strategy overflowStrategy;
   final long pendingKeepaliveNanos;
 
   private final Lock lock = new ReentrantLock();
 
-  private static final Comparator<SizeBoundedQueue> SIZE_FIRST =
-      new Comparator<SizeBoundedQueue>() {
-        @Override
-        public int compare(SizeBoundedQueue q1, SizeBoundedQueue q2) {
-          return q2.count - q1.count;
-        }
-      };
-
-  SizeFirstQueueRecycler(int pendingMaxMessages, Strategy overflowStrategy,
+  RoundRobinQueueRecycler(int pendingMaxMessages, Strategy overflowStrategy,
       long pendingKeepaliveNanos) {
     this.keyToQueue = new ConcurrentHashMap<>();
     this.keyToLastGet = new ConcurrentHashMap<>();
 
-    this.bySize = new PriorityBlockingQueue<>(16, SIZE_FIRST);
+    this.roundRobin = new LinkedBlockingQueue<>();
     this.pendingMaxMessages = pendingMaxMessages;
     this.overflowStrategy = overflowStrategy;
     this.pendingKeepaliveNanos = pendingKeepaliveNanos;
@@ -64,7 +54,7 @@ final class SizeFirstQueueRecycler implements QueueRecycler {
         lock.lock();
         queue = keyToQueue.get(key);
         if (queue == null) {
-          queue = new SizeBoundedQueue(pendingMaxMessages, overflowStrategy);
+          queue = new SizeBoundedQueue(pendingMaxMessages, overflowStrategy, key);
           keyToQueue.put(key, queue);
           recycle(queue);
         }
@@ -79,7 +69,7 @@ final class SizeFirstQueueRecycler implements QueueRecycler {
   @Override
   public SizeBoundedQueue lease(long timeout, TimeUnit unit) {
     try {
-      return bySize.poll(timeout, unit);
+      return roundRobin.poll(timeout, unit);
     } catch (InterruptedException e) {
       logger.error("Interrupted leasing queue.", e);
     }
@@ -90,7 +80,7 @@ final class SizeFirstQueueRecycler implements QueueRecycler {
   public void recycle(SizeBoundedQueue queue) {
     if (queue != null && // offer only when not dead
         (keyToQueue.containsValue(queue) || queue.count > 0)) {
-      bySize.offer(queue);
+      roundRobin.offer(queue);
     }
   }
 
@@ -102,18 +92,21 @@ final class SizeFirstQueueRecycler implements QueueRecycler {
   }
 
   @Override
-  public LinkedList<SizeBoundedQueue> shrink() {
-    LinkedList<SizeBoundedQueue> result = new LinkedList<>();
-    Iterator<MessageKey> iterator = keyToLastGet.keySet().iterator();
+  public LinkedList<MessageKey> shrink() {
+    LinkedList<MessageKey> result = new LinkedList<>();
 
-    while (iterator.hasNext()) {
-      MessageKey next = iterator.next();
+    for (MessageKey next : keyToLastGet.keySet()) {
       if (now() - getOrDefault(keyToLastGet, next, now()) > pendingKeepaliveNanos) {
-        SizeBoundedQueue queue = keyToQueue.remove(next);
-        keyToLastGet.remove(next);
-        if (queue != null) {
-          bySize.remove(queue);
-          result.add(queue);
+        try {
+          lock.lock();
+          SizeBoundedQueue q = keyToQueue.get(next);
+          if (q == null || q.count > 0) continue;
+          keyToLastGet.remove(next);
+          keyToQueue.remove(next);
+          roundRobin.remove(q);
+          result.add(next);
+        } finally {
+          lock.unlock();
         }
       }
     }
@@ -124,10 +117,11 @@ final class SizeFirstQueueRecycler implements QueueRecycler {
   public void clear() {
     keyToQueue.clear();
     keyToLastGet.clear();
-    bySize.clear();
+    roundRobin.clear();
   }
 
-  Collection<SizeBoundedQueue> elements() {
+  @Override
+  public Collection<SizeBoundedQueue> elements() {
     return keyToQueue.values();
   }
 }
