@@ -1,9 +1,11 @@
 package io.bufferslayer;
 
 import static io.bufferslayer.MessageDroppedException.dropped;
-import static io.bufferslayer.OverflowStrategy.Strategy.*;
+import static io.bufferslayer.OverflowStrategy.Strategy.DropBuffer;
+import static io.bufferslayer.OverflowStrategy.Strategy.DropHead;
+import static io.bufferslayer.OverflowStrategy.Strategy.DropNew;
+import static io.bufferslayer.OverflowStrategy.Strategy.DropTail;
 
-import com.google.common.annotations.VisibleForTesting;
 import io.bufferslayer.Message.MessageKey;
 import io.bufferslayer.OverflowStrategy.Strategy;
 import java.util.Arrays;

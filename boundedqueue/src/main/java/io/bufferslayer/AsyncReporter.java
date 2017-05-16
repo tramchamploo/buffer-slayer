@@ -2,9 +2,9 @@ package io.bufferslayer;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static io.bufferslayer.DeferredHolder.newDeferred;
 import static io.bufferslayer.MessageDroppedException.dropped;
 import static io.bufferslayer.OverflowStrategy.Strategy.DropHead;
-import static io.bufferslayer.DeferredHolder.newDeferred;
 import static java.util.Collections.singletonList;
 
 import com.google.common.util.concurrent.MoreExecutors;
