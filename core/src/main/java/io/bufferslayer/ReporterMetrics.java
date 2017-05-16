@@ -1,10 +1,12 @@
 package io.bufferslayer;
 
+import io.bufferslayer.Message.MessageKey;
+
 /**
  * Created by guohang.bao on 2017/2/27.
  * @param <QueueKey> key for updating queued messages
  */
-public abstract class ReporterMetrics<QueueKey> {
+public abstract class ReporterMetrics {
 
   void startExporter(final ReporterMetricsExporter exporter) {
     exporter.start(this);
@@ -26,9 +28,9 @@ public abstract class ReporterMetrics<QueueKey> {
 
   public abstract long queuedMessages();
 
-  public abstract void updateQueuedMessages(QueueKey key, int quantity);
+  public abstract void updateQueuedMessages(MessageKey key, int quantity);
 
-  public abstract void removeQueuedMessages(QueueKey key);
+  public abstract void removeQueuedMessages(MessageKey key);
 
   public static final ReporterMetrics NOOP_METRICS = new ReporterMetrics() {
     @Override
@@ -55,11 +57,11 @@ public abstract class ReporterMetrics<QueueKey> {
     }
 
     @Override
-    public void updateQueuedMessages(Object o, int quantity) {
+    public void updateQueuedMessages(MessageKey key, int quantity) {
     }
 
     @Override
-    public void removeQueuedMessages(Object o) {
+    public void removeQueuedMessages(MessageKey key) {
     }
   };
 }

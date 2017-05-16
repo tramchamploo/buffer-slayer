@@ -1,6 +1,7 @@
 package io.bufferslayer;
 
 import io.bufferslayer.Message.MessageKey;
+import java.util.Collection;
 import java.util.LinkedList;
 import java.util.concurrent.TimeUnit;
 
@@ -35,10 +36,15 @@ public interface QueueRecycler {
   /**
    * Drop queues which exceed its keepalive
    */
-  LinkedList<SizeBoundedQueue> shrink();
+  LinkedList<MessageKey> shrink();
 
   /**
-   * clear everything
+   * Clear everything
    */
   void clear();
+
+  /**
+   * Get all queues
+   */
+  Collection<SizeBoundedQueue> elements();
 }
