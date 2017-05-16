@@ -4,9 +4,8 @@ import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 
-
 /**
- * Created by guohang.bao on 2017/2/27.
+ * Created by tramchamploo on 2017/2/27.
  * Adapted from zipkin
  */
 public interface Component extends Closeable {

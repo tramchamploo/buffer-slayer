@@ -7,7 +7,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * Created by guohang.bao on 2017/2/28.
+ * Created by tramchamploo on 2017/2/28.
  */
 public class InMemoryReporterMetrics extends ReporterMetrics {
 

@@ -28,7 +28,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /**
- * Created by guohang.bao on 2017/3/16.
+ * Created by tramchamploo on 2017/3/16.
  */
 @Measurement(iterations = 5, time = 1)
 @Warmup(iterations = 3, time = 1)

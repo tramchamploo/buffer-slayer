@@ -7,7 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Created by guohang.bao on 2017/3/16.
+ * Created by tramchamploo on 2017/3/16.
  */
 public class LogReporterMetricsExporter extends ReporterMetricsExporter {
 

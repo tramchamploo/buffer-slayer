@@ -5,7 +5,7 @@ import java.util.Arrays;
 import org.springframework.jdbc.core.PreparedStatementSetter;
 
 /**
- * Created by guohang.bao on 2017/2/27.
+ * Created by tramchamploo on 2017/2/27.
  * Represent sql to be buffered
  */
 final class Sql extends Message {
@@ -46,7 +46,7 @@ final class Sql extends Message {
     return "sql: " + sql;
   }
 
-  public static final class Builder {
+  static final class Builder {
 
     private String sql;
     private PreparedStatementSetter preparedStatementSetter;

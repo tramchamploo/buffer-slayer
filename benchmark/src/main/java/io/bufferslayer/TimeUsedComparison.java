@@ -11,7 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /**
- * Created by guohang.bao on 2017/3/30.
+ * Created by tramchamploo on 2017/3/30.
  */
 public class TimeUsedComparison {
 

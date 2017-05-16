@@ -14,7 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Created by guohang.bao on 2017/5/4.
+ * Created by tramchamploo on 2017/5/4.
  */
 final class RoundRobinQueueRecycler implements QueueRecycler {
 

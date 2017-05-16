@@ -8,7 +8,7 @@ import org.jdeferred.multiple.MultipleResults;
 import org.jdeferred.multiple.OneReject;
 
 /**
- * Created by guohang.bao on 2017/4/14.
+ * Created by tramchamploo on 2017/4/14.
  */
 public interface AsyncSender<M extends Message> extends Component {
 

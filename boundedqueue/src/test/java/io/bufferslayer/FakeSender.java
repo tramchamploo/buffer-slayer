@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
- * Created by guohang.bao on 2017/3/14.
+ * Created by tramchamploo on 2017/3/14.
  */
 public class FakeSender implements Sender<TestMessage, Integer> {
 

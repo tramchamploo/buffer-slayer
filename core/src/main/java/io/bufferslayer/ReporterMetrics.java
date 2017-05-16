@@ -3,8 +3,7 @@ package io.bufferslayer;
 import io.bufferslayer.Message.MessageKey;
 
 /**
- * Created by guohang.bao on 2017/2/27.
- * @param <QueueKey> key for updating queued messages
+ * Created by tramchamploo on 2017/2/27.
  */
 public abstract class ReporterMetrics {
 

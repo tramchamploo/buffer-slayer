@@ -11,7 +11,7 @@ import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Created by guohang.bao on 2017/2/27.
+ * Created by tramchamploo on 2017/2/27.
  */
 final class JdbcTemplateSender implements Sender<Sql, Integer> {
 

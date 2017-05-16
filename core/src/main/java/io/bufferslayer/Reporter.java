@@ -3,7 +3,7 @@ package io.bufferslayer;
 import org.jdeferred.Promise;
 
 /**
- * Created by guohang.bao on 2017/2/27.
+ * Created by tramchamploo on 2017/2/27.
  */
 public interface Reporter {
 

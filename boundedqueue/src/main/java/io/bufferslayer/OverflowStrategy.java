@@ -8,7 +8,7 @@ import static io.bufferslayer.OverflowStrategy.Strategy.DropTail;
 import static io.bufferslayer.OverflowStrategy.Strategy.Fail;
 
 /**
- * Created by guohang.bao on 2017/4/10.
+ * Created by tramchamploo on 2017/4/10.
  * Represents a strategy that decides how to deal with a buffer that is full but is
  * about to receive a new element.
  * This is inspired by Akka stream.

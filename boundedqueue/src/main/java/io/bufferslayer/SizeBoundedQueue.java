@@ -16,7 +16,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.jdeferred.Deferred;
 
 /**
- * Created by guohang.bao on 2017/2/28.
+ * Created by tramchamploo on 2017/2/28.
  *
  * Adapted from zipkin
  * Multi-producer, multi-consumer queue that is bounded by count.

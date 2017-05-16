@@ -15,7 +15,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 /**
- * Created by guohang.bao on 2017/5/4.
+ * Created by tramchamploo on 2017/5/4.
  */
 @SuppressWarnings("unchecked")
 public class RoundRobinQueueRecyclerTest {

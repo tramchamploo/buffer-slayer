@@ -34,28 +34,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Created by guohang.bao on 2017/2/28.
+ * Created by tramchamploo on 2017/2/28.
  */
 public class AsyncReporter implements Reporter, Flushable, Component {
 
   private static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
-
   static AtomicLong idGenerator = new AtomicLong();
   private final Long id = idGenerator.getAndIncrement();
-
   final AsyncSender sender;
   private final ReporterMetrics metrics;
-
   private final long messageTimeoutNanos;
   private final int bufferedMaxMessages;
-
   private final boolean strictOrder;
-
   final QueueRecycler pendingRecycler;
-
   private final int flushThreadCount;
+  private final ThreadFactory flushThreadFactory;
   final CopyOnWriteArraySet<Thread> flushThreads = new CopyOnWriteArraySet<>();
-
+  private final AtomicBoolean started = new AtomicBoolean(false);
   private final AtomicBoolean closed = new AtomicBoolean(false);
   CountDownLatch close;
 
@@ -70,15 +65,10 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     this.pendingRecycler = new RoundRobinQueueRecycler(builder.pendingMaxMessages,
         builder.overflowStrategy, builder.pendingKeepaliveNanos);
     this.flushThreadCount = builder.flushThreadCount;
-    ThreadFactory flushThreadFactory = new ThreadFactoryBuilder()
+    flushThreadFactory = new ThreadFactoryBuilder()
         .setNameFormat("AsyncReporter-" + id + "-flush-thread-%d")
         .setDaemon(true)
         .build();
-    if (messageTimeoutNanos > 0) {
-      for (int i = 0; i < flushThreadCount; i++) {
-        flushThreads.add(startFlushThread(flushThreadFactory));
-      }
-    }
   }
 
   public static Builder builder(Sender sender) {
@@ -174,6 +164,12 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     }
   }
 
+  private void startFlushThreads() {
+    for (int i = 0; messageTimeoutNanos > 0 && i < flushThreadCount; i++) {
+      flushThreads.add(startFlushThread(flushThreadFactory));
+    }
+  }
+
   private Thread startFlushThread(final ThreadFactory threadFactory) {
     final BufferNextMessage consumer =
         new BufferNextMessage(bufferedMaxMessages, messageTimeoutNanos, strictOrder);
@@ -217,6 +213,10 @@ public class AsyncReporter implements Reporter, Flushable, Component {
       DeferredObject<Object, MessageDroppedException, Integer> deferred = new DeferredObject<>();
       deferred.reject(dropped(new IllegalStateException("closed!"), singletonList(message)));
       return deferred.promise();
+    }
+    // Lazy initialize flush threads
+    if (started.compareAndSet(false, true)) {
+      startFlushThreads();
     }
     // If strictOrder is true, ignore original message key.
     Message.MessageKey key = message.asMessageKey();
