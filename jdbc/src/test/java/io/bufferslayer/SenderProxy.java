@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
- * Created by guohang.bao on 2017/3/29.
+ * Created by tramchamploo on 2017/3/29.
  */
 public class SenderProxy implements Sender<Sql, Integer> {
 

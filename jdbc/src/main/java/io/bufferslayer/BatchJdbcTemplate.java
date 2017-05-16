@@ -29,7 +29,7 @@ import org.springframework.jdbc.support.nativejdbc.NativeJdbcExtractor;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
 
 /**
- * Created by guohang.bao on 2017/3/3.
+ * Created by tramchamploo on 2017/3/3.
  */
 public class BatchJdbcTemplate {
 

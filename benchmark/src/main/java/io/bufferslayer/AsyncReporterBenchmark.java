@@ -21,7 +21,7 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 /**
- * Created by guohang.bao on 2017/3/16.
+ * Created by tramchamploo on 2017/3/16.
  */
 @Measurement(iterations = 5, time = 1)
 @Warmup(iterations = 10, time = 1)

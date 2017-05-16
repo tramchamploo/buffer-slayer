@@ -16,7 +16,7 @@ import org.junit.After;
 import org.junit.Test;
 
 /**
- * Created by guohang.bao on 2017/3/14.
+ * Created by tramchamploo on 2017/3/14.
  */
 public class AsyncReporterTest {
 
@@ -325,5 +325,17 @@ public class AsyncReporterTest {
     Thread.sleep(10);
     reporter.flush();
     assertEquals(0, metrics.queuedMessages.size());
+  }
+
+  @Test
+  public void lazyInitFlushThreads() throws InterruptedException {
+    FakeSender sender = new FakeSender();
+    reporter = AsyncReporter.builder(sender).flushThreadCount(1).build();
+
+    assertEquals(0, reporter.flushThreads.size());
+    reporter.report(newMessage(0));
+    assertEquals(1, reporter.flushThreads.size());
+    reporter.report(newMessage(0));
+    assertEquals(1, reporter.flushThreads.size());
   }
 }

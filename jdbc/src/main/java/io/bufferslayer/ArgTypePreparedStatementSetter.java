@@ -30,7 +30,7 @@ class ArgTypePreparedStatementSetter implements PreparedStatementSetter, Paramet
    * @param args the arguments to set
    * @param argTypes the corresponding SQL types of the arguments
    */
-  public ArgTypePreparedStatementSetter(Object[] args, int[] argTypes) {
+  ArgTypePreparedStatementSetter(Object[] args, int[] argTypes) {
     if ((args != null && argTypes == null) || (args == null && argTypes != null) ||
         (args != null && args.length != argTypes.length)) {
       throw new InvalidDataAccessApiUsageException("args and argTypes parameters must match");

@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Created by guohang.bao on 2017/5/4.
+ * Created by tramchamploo on 2017/5/4.
  * A recycler that manages {@link SizeBoundedQueue}'s lifecycle
  */
 public interface QueueRecycler {

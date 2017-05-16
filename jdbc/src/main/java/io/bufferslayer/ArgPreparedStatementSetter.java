@@ -24,7 +24,7 @@ class ArgPreparedStatementSetter implements PreparedStatementSetter, ParameterDi
    *
    * @param args the arguments to set
    */
-  public ArgPreparedStatementSetter(Object[] args) {
+  ArgPreparedStatementSetter(Object[] args) {
     this.args = args;
   }
 

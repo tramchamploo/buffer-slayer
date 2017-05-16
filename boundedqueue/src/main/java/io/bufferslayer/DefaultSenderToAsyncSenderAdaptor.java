@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.concurrent.Executor;
 
 /**
- * Created by guohang.bao on 2017/4/14.
+ * Created by tramchamploo on 2017/4/14.
  */
 final class DefaultSenderToAsyncSenderAdaptor<M extends Message, R> extends
     SenderToAsyncSenderAdaptor<M, R> {

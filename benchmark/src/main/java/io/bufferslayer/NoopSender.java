@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Created by guohang.bao on 2017/3/27.
+ * Created by tramchamploo on 2017/3/27.
  */
 public class NoopSender implements Sender {
 

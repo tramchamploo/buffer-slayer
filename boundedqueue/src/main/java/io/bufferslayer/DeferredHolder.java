@@ -6,7 +6,7 @@ import org.jdeferred.Deferred;
 import org.jdeferred.impl.DeferredObject;
 
 /**
- * Created by guohang.bao on 2017/4/12.
+ * Created by tramchamploo on 2017/4/12.
  * Maintain a mapping from messageId to Defferred
  */
 class DeferredHolder {

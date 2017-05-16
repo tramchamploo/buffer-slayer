@@ -9,7 +9,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Created by guohang.bao on 2017/3/16.
+ * Created by tramchamploo on 2017/3/16.
  */
 public class ReporterProperties {
 

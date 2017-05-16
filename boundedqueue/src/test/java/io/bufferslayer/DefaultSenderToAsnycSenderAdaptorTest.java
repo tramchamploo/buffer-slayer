@@ -11,7 +11,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 /**
- * Created by guohang.bao on 2017/4/17.
+ * Created by tramchamploo on 2017/4/17.
  */
 public class DefaultSenderToAsnycSenderAdaptorTest {
 
