@@ -48,6 +48,13 @@ public class RoundRobinQueueRecyclerTest {
     assertEquals(q1, recycler.lease(1, TimeUnit.MILLISECONDS));
     assertEquals(q2, recycler.lease(1, TimeUnit.MILLISECONDS));
     assertNull(recycler.lease(1, TimeUnit.MILLISECONDS));
+
+    recycler.recycle(q1);
+    recycler.recycle(q2);
+    recycler.recycle(q0);
+    assertEquals(q1, recycler.lease(1, TimeUnit.MILLISECONDS));
+    assertEquals(q2, recycler.lease(1, TimeUnit.MILLISECONDS));
+    assertEquals(q0, recycler.lease(1, TimeUnit.MILLISECONDS));
   }
 
   @Test
