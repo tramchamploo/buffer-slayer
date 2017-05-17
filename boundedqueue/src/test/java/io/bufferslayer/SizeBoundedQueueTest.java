@@ -162,9 +162,9 @@ public class SizeBoundedQueueTest {
       queue.offer(shouldBlock, newDeferred(shouldBlock));
       countDown.countDown();
     }).start();
-    assertFalse(countDown.await(1, TimeUnit.MILLISECONDS));
+    assertFalse(countDown.await(5, TimeUnit.MILLISECONDS));
     queue.drainTo(next -> true, 0);
-    assertTrue(countDown.await(1, TimeUnit.MILLISECONDS));
+    assertTrue(countDown.await(5, TimeUnit.MILLISECONDS));
   }
 
   @Test
