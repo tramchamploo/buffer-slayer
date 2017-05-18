@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 public class HttpReporterMetricsExporter extends ReporterMetricsExporter {
 
   private static final Logger logger = LoggerFactory.getLogger(HttpReporterMetricsExporter.class);
-  private static final int PORT = 15090;
+  static final int PORT = 15090;
 
   private class HttpServer extends NanoHTTPD {
 
@@ -27,12 +27,12 @@ public class HttpReporterMetricsExporter extends ReporterMetricsExporter {
 
     @Override
     public Response serve(IHTTPSession session) {
-      String msg = "<html><body><h1>Reporter Metrics</h1><ul>"
-          + "<li>Messages: " + metrics.messages() + "</li>"
-          + "<li>MessagesDropped: " + metrics.messagesDropped() + "</li>"
-          + "<li>QueuedMessages: " + metrics.queuedMessages() + "</li>"
-          + "</ul></body></html>";
-      return newFixedLengthResponse(msg);
+      String msg = "{"
+          + "\"messages\":" + metrics.messages() + ","
+          + "\"messagesDropped\":" + metrics.messagesDropped() + ","
+          + "\"queuedMessages\":" + metrics.messagesDropped()
+          + "}";
+      return newFixedLengthResponse(NanoHTTPD.Response.Status.OK, "application/json", msg);
     }
   }
 
