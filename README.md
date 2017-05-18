@@ -50,13 +50,12 @@ The update directly goes to the reporter and returns a Promise.
 
 ```java
 ReporterProperties reporterProperties = new ReporterProperties()
+        .setFlushThreads(5)
+        .setSenderThreads(50)
         .setBufferedMaxMessages(500)
         .setPendingMaxMessages(10000)
         .setMetrics("inmemory")
-        .setMetricsExporter("http")
-        .setParallelismPerBatch(5)
-        .setSenderExecutor(new ThreadPoolExecutor(200,
-            200, 0, TimeUnit.MILLISECONDS, new SynchronousQueue<>()));
+        .setMetricsExporter("http");
 
 BatchJdbcTemplate template = new BatchJdbcTemplate(reporterProperties);
 template.setDataSource(dataSource);

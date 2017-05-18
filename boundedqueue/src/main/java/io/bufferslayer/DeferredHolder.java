@@ -7,7 +7,7 @@ import org.jdeferred.impl.DeferredObject;
 
 /**
  * Created by tramchamploo on 2017/4/12.
- * Maintain a mapping from messageId to Defferred
+ * Maintain a mapping from messageId to Deferred
  */
 class DeferredHolder {
 
@@ -52,8 +52,8 @@ class DeferredHolder {
   }
 
   static <T extends Message> void batchReject(List<T> messages, MessageDroppedException ex) {
-    for (int i = 0; i < messages.size(); i++) {
-      doReject(messages.get(i), ex);
+    for (T message : messages) {
+      doReject(message, ex);
     }
   }
 }
