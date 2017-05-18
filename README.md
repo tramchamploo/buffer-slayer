@@ -22,16 +22,15 @@ This project is inspired by [zipkin-reporter-java](https://github.com/openzipkin
 This is where you configure all properties.
 
 * `sender`: Sender that messages are flushed into. Necessary but often not needed for users to configure. Implementations like `JdbcTemplate` will configure it by itself.
+* `senderThreads`: Num of threads that sender execute in.
 * `metrics`: (inmemory, noop) metrics that records nums of sent, dropped, queued messages.
 * `metricsExporter`: (http, log) exporter to let users know data of metrics.
 * `bufferedMaxMessages`: Max size of buffer that sent in one batch.
 * `messageTimeoutNanos`: If buffer size is not reached, flush will be invoked after this timeout.
 * `pendingMaxMessages`: Max size of messages to be stashed until OverflowStrategy is triggered.
 * `pendingKeepaliveNanos`: Pending queue should die if no messages queued into during in its keepalive.
-* `flushThreadCount`: Num of threads that flush messages to sender.
+* `flushThreads`: Num of threads that flush messages to sender.
 * `overflowStrategy`: (DropHead, DropTail, DropBuffer, DropNew, Fail) after pendingMaxMessages is reached, the strategy will be triggered.
-* `senderExecutor`: Executor for sender to run with.
-* `parallelismPerBatch`: `bufferedMaxMessages` of messages can be divided into pieces and executed in parallel in `senderExecutor`.
 * `strictOrder`: Whether the messages be sent in order. Notice that if this value is true, different kinds of messages will be staged in the same `SizeBoundedQueue`.
 
 ## JdbcTemplate

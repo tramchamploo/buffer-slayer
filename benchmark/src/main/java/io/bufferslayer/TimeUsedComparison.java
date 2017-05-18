@@ -3,7 +3,6 @@ package io.bufferslayer;
 import java.util.Date;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -59,8 +58,7 @@ public class TimeUsedComparison {
         .bufferedMaxMessages(100)
         .messageTimeout(50, TimeUnit.MILLISECONDS)
         .pendingKeepalive(10, TimeUnit.MILLISECONDS)
-        .senderExecutor(Executors.newCachedThreadPool())
-        .parallelismPerBatch(10)
+        .senderThreads(10)
         .strictOrder(true)
         .build();
     batch = new BatchJdbcTemplate(delegate, reporter);

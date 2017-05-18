@@ -7,8 +7,6 @@ import static io.bufferslayer.MessageDroppedException.dropped;
 import static io.bufferslayer.OverflowStrategy.Strategy.DropHead;
 import static java.util.Collections.singletonList;
 
-import com.google.common.util.concurrent.MoreExecutors;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.bufferslayer.Message.MessageKey;
 import io.bufferslayer.OverflowStrategy.Strategy;
 import io.bufferslayer.internal.Component;
@@ -17,8 +15,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -27,9 +23,6 @@ import org.jdeferred.DoneCallback;
 import org.jdeferred.FailCallback;
 import org.jdeferred.Promise;
 import org.jdeferred.impl.DeferredObject;
-import org.jdeferred.multiple.MasterProgress;
-import org.jdeferred.multiple.MultipleResults;
-import org.jdeferred.multiple.OneReject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,35 +33,31 @@ public class AsyncReporter implements Reporter, Flushable, Component {
 
   private static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
   static AtomicLong idGenerator = new AtomicLong();
-  private final Long id = idGenerator.getAndIncrement();
+  final Long id = idGenerator.getAndIncrement();
   final AsyncSender sender;
-  private final ReporterMetrics metrics;
-  private final long messageTimeoutNanos;
-  private final int bufferedMaxMessages;
-  private final boolean strictOrder;
+  final ReporterMetrics metrics;
+  final long messageTimeoutNanos;
+  final int bufferedMaxMessages;
+  final boolean strictOrder;
   final QueueRecycler pendingRecycler;
-  private final int flushThreadCount;
-  private final ThreadFactory flushThreadFactory;
-  final CopyOnWriteArraySet<Thread> flushThreads = new CopyOnWriteArraySet<>();
-  private final AtomicBoolean started = new AtomicBoolean(false);
-  private final AtomicBoolean closed = new AtomicBoolean(false);
+  final int flushThreads;
+  final FlushThreadFactory flushThreadFactory;
+  final CopyOnWriteArraySet<Thread> flushers = new CopyOnWriteArraySet<>();
+  final AtomicBoolean started = new AtomicBoolean(false);
+  final AtomicBoolean closed = new AtomicBoolean(false);
   CountDownLatch close;
 
   @SuppressWarnings("unchecked")
   private AsyncReporter(Builder builder) {
-    this.sender = new DefaultSenderToAsyncSenderAdaptor(builder.sender,
-        builder.senderExecutor, builder.parallelismPerBatch);
+    this.sender = new SenderToAsyncSenderAdaptor(builder.sender, id, builder.senderThreads);
     this.metrics = builder.metrics;
     this.messageTimeoutNanos = builder.messageTimeoutNanos;
     this.bufferedMaxMessages = builder.bufferedMaxMessages;
     this.strictOrder = builder.strictOrder;
     this.pendingRecycler = new RoundRobinQueueRecycler(builder.pendingMaxMessages,
         builder.overflowStrategy, builder.pendingKeepaliveNanos);
-    this.flushThreadCount = builder.flushThreadCount;
-    flushThreadFactory = new ThreadFactoryBuilder()
-        .setNameFormat("AsyncReporter-" + id + "-flush-thread-%d")
-        .setDaemon(true)
-        .build();
+    this.flushThreads = builder.flushThreads;
+    this.flushThreadFactory = new FlushThreadFactory(this);
   }
 
   public static Builder builder(Sender sender) {
@@ -76,14 +65,14 @@ public class AsyncReporter implements Reporter, Flushable, Component {
   }
 
   public static final class Builder {
+
     final Sender sender;
-    Executor senderExecutor = MoreExecutors.directExecutor();
-    int parallelismPerBatch = 1;
+    int senderThreads = 1;
     ReporterMetrics metrics = ReporterMetrics.NOOP_METRICS;
     long messageTimeoutNanos = TimeUnit.SECONDS.toNanos(1);
     int bufferedMaxMessages = 100;
     int pendingMaxMessages = 10000;
-    int flushThreadCount = 5;
+    int flushThreads = 5;
     long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
     boolean strictOrder = false;
     Strategy overflowStrategy = DropHead;
@@ -93,14 +82,9 @@ public class AsyncReporter implements Reporter, Flushable, Component {
       this.sender = sender;
     }
 
-    public Builder senderExecutor(Executor executor) {
-      this.senderExecutor = checkNotNull(executor, "executor");
-      return this;
-    }
-
-    public Builder parallelismPerBatch(int parallelism) {
-      checkArgument(parallelism >= 0, "parallelism >= 0: %s", parallelism);
-      this.parallelismPerBatch = parallelism;
+    public Builder senderThreads(int senderThreads) {
+      checkArgument(senderThreads > 0, "senderThreads > 0: %s", senderThreads);
+      this.senderThreads = senderThreads;
       return this;
     }
 
@@ -127,9 +111,9 @@ public class AsyncReporter implements Reporter, Flushable, Component {
       return this;
     }
 
-    public Builder flushThreadCount(int flushThreadCount) {
-      checkArgument(flushThreadCount > 0, "flushThreadCount > 0: %s", flushThreadCount);
-      this.flushThreadCount = flushThreadCount;
+    public Builder flushThreads(int flushThreads) {
+      checkArgument(flushThreads > 0, "flushThreads > 0: %s", flushThreads);
+      this.flushThreads = flushThreads;
       return this;
     }
 
@@ -154,10 +138,6 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     }
   }
 
-  private SizeBoundedQueue leaseQueue() {
-    return pendingRecycler.lease(messageTimeoutNanos, TimeUnit.NANOSECONDS);
-  }
-
   private void clearMetrics(Collection<MessageKey> keys) {
     for (MessageKey key: keys) {
       metrics.removeQueuedMessages(key);
@@ -165,43 +145,11 @@ public class AsyncReporter implements Reporter, Flushable, Component {
   }
 
   private void startFlushThreads() {
-    for (int i = 0; messageTimeoutNanos > 0 && i < flushThreadCount; i++) {
-      flushThreads.add(startFlushThread(flushThreadFactory));
+    for (int i = 0; messageTimeoutNanos > 0 && i < flushThreads; i++) {
+      Thread thread = flushThreadFactory.newFlushThread();
+      thread.start();
+      flushers.add(thread);
     }
-  }
-
-  private Thread startFlushThread(final ThreadFactory threadFactory) {
-    final BufferNextMessage consumer =
-        new BufferNextMessage(bufferedMaxMessages, messageTimeoutNanos, strictOrder);
-    Thread flushThread = threadFactory.newThread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          while (!closed.get()) {
-            SizeBoundedQueue q = leaseQueue();
-            if (q == null) continue;
-            try {
-              flush(q, consumer);
-            } finally {
-              pendingRecycler.recycle(q);
-            }
-          }
-        } finally {
-          // flush messages left in buffer
-          List<Message> drained = consumer.drain();
-          SizeBoundedQueue q;
-          if (drained.size() > 0 && (q = leaseQueue()) != null) {
-            for (Message message : drained) q.offer(message, newDeferred(message.id));
-            flushTillEmpty(q);
-          }
-          // wake up notice thread
-          if (closed.get()) close.countDown();
-        }
-      }
-    });
-
-    flushThread.start();
-    return flushThread;
   }
 
   @Override
@@ -243,9 +191,9 @@ public class AsyncReporter implements Reporter, Flushable, Component {
   /**
    * Flush the queue right now.
    */
-  private void flushTillEmpty(SizeBoundedQueue pending) {
+  void flushTillEmpty(SizeBoundedQueue pending) {
     BufferNextMessage rightNow = new BufferNextMessage(bufferedMaxMessages, 0, strictOrder);
-    while (pending.count > 0) flush(pending, rightNow);
+    while (pending.count > 0) blockingFlush(pending, rightNow);
   }
 
   @Override
@@ -253,12 +201,22 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     for (SizeBoundedQueue pending : pendingRecycler.elements()) {
       BufferNextMessage rightNow =
           new BufferNextMessage(bufferedMaxMessages, 0, strictOrder);
-      flush(pending, rightNow);
+      blockingFlush(pending, rightNow);
+    }
+  }
+
+  private void blockingFlush(SizeBoundedQueue pending, BufferNextMessage buffer) {
+    Promise<List<?>, MessageDroppedException, ?> promise = flush(pending, buffer);
+    try {
+      promise.waitSafely();
+    } catch (InterruptedException e) {
+      logger.warn("Interrupted flushing messages.");
     }
   }
 
   @SuppressWarnings("unchecked")
-  void flush(SizeBoundedQueue pending, BufferNextMessage consumer) {
+  Promise<List<?>, MessageDroppedException, ?> flush(SizeBoundedQueue pending,
+      BufferNextMessage consumer) {
     int total = 0;
     do { // Drain the queue as many as we could
       int drained = pending.drainTo(consumer, consumer.remainingNanos());
@@ -268,34 +226,34 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     // Remove overtime queues and relative metrics
     clearMetrics(pendingRecycler.shrink());
 
-    if (total == 0) return;
+    if (total == 0) {
+      DeferredObject<List<?>, MessageDroppedException, ?> empty = new DeferredObject<>();
+      empty.resolve(null);
+      return empty.promise();
+    }
     // Update metrics
     metrics.updateQueuedMessages(pending.key, pending.count);
     // Consumer should be ready to drain
     final List<Message> messages = consumer.drain();
-    Promise<MultipleResults, OneReject, MasterProgress> promise = sender.send(messages);
+    Promise<List<?>, MessageDroppedException, ?> promise = sender.send(messages);
     addCallbacks(messages, promise);
-    try {
-      promise.waitSafely();
-    } catch (InterruptedException e) {
-      logger.error("Interrupted flushing messages");
-    }
+    return promise;
   }
 
   /**
    * Resolve the promises returned to the caller by sending result.
    */
   private void addCallbacks(final List<Message> messages,
-      Promise<MultipleResults, OneReject, MasterProgress> promise) {
-    promise.done(new DoneCallback<MultipleResults>() {
+      Promise<List<?>, MessageDroppedException, ?> promise) {
+    promise.done(new DoneCallback<List<?>>() {
       @Override
-      public void onDone(MultipleResults result) {
-        DeferredHolder.batchResolve(messages, DeferredUtil.toResults(result));
+      public void onDone(List<?> result) {
+        DeferredHolder.batchResolve(messages, result);
       }
-    }).fail(new FailCallback<OneReject>() {
+    }).fail(new FailCallback<MessageDroppedException>() {
       @Override
-      public void onFail(OneReject reject) {
-        DeferredHolder.batchReject(messages, (MessageDroppedException) reject.getReject());
+      public void onFail(MessageDroppedException reject) {
+        DeferredHolder.batchReject(messages, reject);
       }
     }).fail(loggingCallback());
   }
@@ -303,12 +261,11 @@ public class AsyncReporter implements Reporter, Flushable, Component {
   /**
    * Log errors only when sending fails.
    */
-  private FailCallback<OneReject> loggingCallback() {
-    return new FailCallback<OneReject>() {
+  private FailCallback<MessageDroppedException> loggingCallback() {
+    return new FailCallback<MessageDroppedException>() {
       @Override
-      public void onFail(OneReject reject) {
-        MessageDroppedException ex = (MessageDroppedException) reject.getReject();
-        logger.warn(ex.getMessage());
+      public void onFail(MessageDroppedException reject) {
+        logger.warn(reject.getMessage());
       }
     };
   }
@@ -320,7 +277,7 @@ public class AsyncReporter implements Reporter, Flushable, Component {
 
   @Override
   public void close() {
-    close = new CountDownLatch(messageTimeoutNanos > 0 ? flushThreadCount : 0);
+    close = new CountDownLatch(messageTimeoutNanos > 0 ? flushThreads : 0);
     closed.set(true);
     try {
       if (!close.await(messageTimeoutNanos, TimeUnit.NANOSECONDS)) {
