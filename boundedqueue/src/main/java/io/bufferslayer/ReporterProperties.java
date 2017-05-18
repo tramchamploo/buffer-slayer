@@ -2,10 +2,8 @@ package io.bufferslayer;
 
 import static io.bufferslayer.OverflowStrategy.Strategy.DropHead;
 
-import com.google.common.util.concurrent.MoreExecutors;
 import io.bufferslayer.AsyncReporter.Builder;
 import io.bufferslayer.ReporterMetricsExporter.Exporters;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -14,13 +12,12 @@ import java.util.concurrent.TimeUnit;
 public class ReporterProperties {
 
   private Sender sender;
-  private int parallelismPerBatch = 1;
-  private Executor senderExecutor = MoreExecutors.directExecutor();
+  private int senderThreads = 1;
   private String metrics = "noop";
   private Exporters metricsExporter = Exporters.noop;
   private long messageTimeoutNanos = TimeUnit.SECONDS.toNanos(1);
   private long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
-  private int flushThreadCount = 5;
+  private int flushThreads = 5;
   private int bufferedMaxMessages = 100;
   private int pendingMaxMessages = 10000;
   private boolean strictOrder = false;
@@ -35,21 +32,12 @@ public class ReporterProperties {
     return this;
   }
 
-  public int getParallelismPerBatch() {
-    return parallelismPerBatch;
+  public int getSenderThreads() {
+    return senderThreads;
   }
 
-  public ReporterProperties setParallelismPerBatch(int parallelism) {
-    this.parallelismPerBatch = parallelism;
-    return this;
-  }
-
-  public Executor getSenderExecutor() {
-    return senderExecutor;
-  }
-
-  public ReporterProperties setSenderExecutor(Executor executor) {
-    this.senderExecutor = executor;
+  public ReporterProperties setSenderThreads(int senderThreads) {
+    this.senderThreads = senderThreads;
     return this;
   }
 
@@ -83,12 +71,12 @@ public class ReporterProperties {
     return this;
   }
 
-  public int getFlushThreadCount() {
-    return flushThreadCount;
+  public int getFlushThreads() {
+    return flushThreads;
   }
 
-  public ReporterProperties setFlushThreadCount(int flushThreadCount) {
-    this.flushThreadCount = flushThreadCount;
+  public ReporterProperties setFlushThreads(int flushThreads) {
+    this.flushThreads = flushThreads;
     return this;
   }
 
@@ -145,11 +133,10 @@ public class ReporterProperties {
 
   public AsyncReporter.Builder toBuilder() {
     Builder builder = new Builder(sender)
-        .senderExecutor(senderExecutor)
-        .parallelismPerBatch(parallelismPerBatch)
+        .senderThreads(senderThreads)
         .messageTimeout(messageTimeoutNanos, TimeUnit.NANOSECONDS)
         .pendingKeepalive(pendingKeepaliveNanos, TimeUnit.NANOSECONDS)
-        .flushThreadCount(flushThreadCount)
+        .flushThreads(flushThreads)
         .bufferedMaxMessages(bufferedMaxMessages)
         .pendingMaxMessages(pendingMaxMessages)
         .strictOrder(strictOrder)

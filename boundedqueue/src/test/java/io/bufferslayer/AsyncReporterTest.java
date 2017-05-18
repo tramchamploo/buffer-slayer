@@ -7,9 +7,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.jdeferred.Promise;
 import org.junit.After;
@@ -210,63 +208,6 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void successAndFailInSameBatch() {
-    FakeSender sender = new FakeSender();
-    AtomicInteger count = new AtomicInteger();
-    String errorMsg = "Second messages fails";
-
-    sender.onMessages(msgs -> {
-      if (count.incrementAndGet() == 2 && msgs.size() == 2) {
-        throw new RuntimeException(errorMsg);
-      }
-    });
-
-    reporter = AsyncReporter.builder(sender)
-        .metrics(metrics)
-        .messageTimeout(0, TimeUnit.MILLISECONDS)
-        .parallelismPerBatch(2)
-        .senderExecutor(Executors.newCachedThreadPool())
-        .build();
-
-    Promise<Object, MessageDroppedException, Integer> promise = reporter.report(newMessage(0));
-    promise.fail(ex -> {
-      assertEquals(2, ex.dropped.size());
-      assertEquals(errorMsg, ex.getCause().getMessage());
-    });
-    reporter.report(newMessage(0));
-
-    reporter.report(newMessage(0));
-    reporter.report(newMessage(0));
-
-    reporter.flush();
-
-    assertEquals(4, metrics.messagesDropped());
-    assertEquals(4, metrics.messages());
-  }
-
-  @Test
-  public void successAndFailInDifferentBatch() {
-    FakeSender sender = new FakeSender();
-    AtomicInteger count = new AtomicInteger();
-    sender.onMessages(msgs -> {
-      if (count.incrementAndGet() == 2) throw new RuntimeException("Second message fails");
-    });
-
-    reporter = AsyncReporter.builder(sender)
-        .metrics(metrics)
-        .messageTimeout(0, TimeUnit.MILLISECONDS)
-        .parallelismPerBatch(2)
-        .senderExecutor(Executors.newCachedThreadPool())
-        .build();
-
-    reporter.report(newMessage(0));
-    reporter.report(newMessage(0));
-    reporter.flush();
-
-    assertEquals(2, metrics.messagesDropped());
-  }
-
-  @Test
   public void flushThreadName() {
     FakeSender sender = new FakeSender();
 
@@ -274,14 +215,14 @@ public class AsyncReporterTest {
     reporter = AsyncReporter.builder(sender).build();
     reporter.report(newMessage(0));
 
-    Iterator<Thread> iter = reporter.flushThreads.iterator();
+    Iterator<Thread> iter = reporter.flushers.iterator();
     assertTrue(iter.hasNext());
     assertEquals("AsyncReporter-0-flush-thread-0", iter.next().getName());
 
     reporter = AsyncReporter.builder(sender).build();
     reporter.report(newMessage(0));
 
-    iter = reporter.flushThreads.iterator();
+    iter = reporter.flushers.iterator();
     assertTrue(iter.hasNext());
     assertEquals("AsyncReporter-1-flush-thread-0", iter.next().getName());
   }
@@ -330,12 +271,12 @@ public class AsyncReporterTest {
   @Test
   public void lazyInitFlushThreads() throws InterruptedException {
     FakeSender sender = new FakeSender();
-    reporter = AsyncReporter.builder(sender).flushThreadCount(1).build();
+    reporter = AsyncReporter.builder(sender).flushThreads(1).build();
 
-    assertEquals(0, reporter.flushThreads.size());
+    assertEquals(0, reporter.flushers.size());
     reporter.report(newMessage(0));
-    assertEquals(1, reporter.flushThreads.size());
+    assertEquals(1, reporter.flushers.size());
     reporter.report(newMessage(0));
-    assertEquals(1, reporter.flushThreads.size());
+    assertEquals(1, reporter.flushers.size());
   }
 }

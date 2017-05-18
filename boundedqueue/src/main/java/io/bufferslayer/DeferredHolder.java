@@ -39,8 +39,7 @@ class DeferredHolder {
 
   static void reject(MessageDroppedException ex) {
     List<? extends Message> dropped = ex.dropped;
-    for (int i = 0; i < dropped.size(); i++) {
-      Message message = dropped.get(i);
+    for (Message message : dropped) {
       doReject(message, ex);
     }
   }

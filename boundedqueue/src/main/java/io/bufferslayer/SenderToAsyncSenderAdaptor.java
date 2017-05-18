@@ -1,65 +1,53 @@
 package io.bufferslayer;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy;
+import java.util.concurrent.TimeUnit;
 import org.jdeferred.Deferred;
-import org.jdeferred.DeferredManager;
 import org.jdeferred.Promise;
-import org.jdeferred.impl.DefaultDeferredManager;
 import org.jdeferred.impl.DeferredObject;
-import org.jdeferred.multiple.MasterProgress;
-import org.jdeferred.multiple.MultipleResults;
-import org.jdeferred.multiple.OneReject;
 
 /**
  * Created by tramchamploo on 2017/4/14.
  */
-abstract class SenderToAsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M> {
+final class SenderToAsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M, R> {
 
   final Sender<M, R> delegate;
   final Executor executor;
-  final DeferredManager deferredManager = new DefaultDeferredManager();
 
-  SenderToAsyncSenderAdaptor(Sender<M, R> delegate, Executor executor) {
+  SenderToAsyncSenderAdaptor(Sender<M, R> delegate, long reporterId, int senderThreads) {
     this.delegate = checkNotNull(delegate);
-    this.executor = checkNotNull(executor);
+    checkArgument(senderThreads > 0, "senderThreads > 0: %s", senderThreads);
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat("AsyncReporter-" + reporterId + "-sender-%d").build();
+    this.executor = new ThreadPoolExecutor(senderThreads, senderThreads, 0, TimeUnit.MILLISECONDS,
+        new SynchronousQueue<Runnable>(), threadFactory, new CallerRunsPolicy());
   }
 
-  /**
-   * Split messages into pieces so that they can be sent in parallel
-   *
-   * @param messages messages to split
-   * @return splitted messages
-   */
-  protected abstract List<List<M>> split(List<M> messages);
-
   @Override
-  public Promise<MultipleResults, OneReject, MasterProgress> send(List<M> messages) {
-    List<List<M>> batches = split(messages);
-    List<Promise<List<R>, MessageDroppedException, ?>> promises =
-        new ArrayList<>(batches.size());
-
-    for (final List<M> batch : batches) {
-      final Deferred<List<R>, MessageDroppedException, ?> deferred = new DeferredObject<>();
-      executor.execute(new Runnable() {
-        @Override
-        public void run() {
-          try {
-            deferred.resolve(delegate.send(batch));
-          } catch (Throwable t) {
-            deferred.reject(MessageDroppedException.dropped(t, batch));
-          }
+  public Promise<List<R>, MessageDroppedException, ?> send(final List<M> messages) {
+    final Deferred<List<R>, MessageDroppedException, ?> result = new DeferredObject<>();
+    executor.execute(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          result.resolve(delegate.send(messages));
+        } catch (Throwable t) {
+          result.reject(MessageDroppedException.dropped(t, messages));
         }
-      });
-      promises.add(deferred.promise());
-    }
-
-    return deferredManager.when(promises.toArray(new Promise[0]));
+      }
+    });
+    return result.promise();
   }
 
   @Override
