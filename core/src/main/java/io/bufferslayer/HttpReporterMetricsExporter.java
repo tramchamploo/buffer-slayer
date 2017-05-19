@@ -30,7 +30,7 @@ public class HttpReporterMetricsExporter extends ReporterMetricsExporter {
       String msg = "{"
           + "\"messages\":" + metrics.messages() + ","
           + "\"messagesDropped\":" + metrics.messagesDropped() + ","
-          + "\"queuedMessages\":" + metrics.messagesDropped()
+          + "\"queuedMessages\":" + metrics.queuedMessages()
           + "}";
       return newFixedLengthResponse(NanoHTTPD.Response.Status.OK, "application/json", msg);
     }

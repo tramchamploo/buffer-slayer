@@ -7,6 +7,7 @@ import static io.bufferslayer.MessageDroppedException.dropped;
 import static io.bufferslayer.OverflowStrategy.Strategy.DropHead;
 import static java.util.Collections.singletonList;
 
+import com.google.common.base.Strings;
 import io.bufferslayer.Message.MessageKey;
 import io.bufferslayer.OverflowStrategy.Strategy;
 import io.bufferslayer.internal.Component;
@@ -39,10 +40,10 @@ public class AsyncReporter implements Reporter, Flushable, Component {
   final long messageTimeoutNanos;
   final int bufferedMaxMessages;
   final boolean strictOrder;
-  final QueueRecycler pendingRecycler;
   final int flushThreads;
   final FlushThreadFactory flushThreadFactory;
   final CopyOnWriteArraySet<Thread> flushers = new CopyOnWriteArraySet<>();
+  final QueueRecycler pendingRecycler;
   final AtomicBoolean started = new AtomicBoolean(false);
   final AtomicBoolean closed = new AtomicBoolean(false);
   CountDownLatch close;
@@ -54,10 +55,16 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     this.messageTimeoutNanos = builder.messageTimeoutNanos;
     this.bufferedMaxMessages = builder.bufferedMaxMessages;
     this.strictOrder = builder.strictOrder;
-    this.pendingRecycler = new RoundRobinQueueRecycler(builder.pendingMaxMessages,
-        builder.overflowStrategy, builder.pendingKeepaliveNanos);
     this.flushThreads = builder.flushThreads;
     this.flushThreadFactory = new FlushThreadFactory(this);
+    switch (builder.recycler.toLowerCase()) {
+      case "roundrobin":
+        this.pendingRecycler = new RoundRobinQueueRecycler(builder.pendingMaxMessages,
+            builder.overflowStrategy, builder.pendingKeepaliveNanos); break;
+      default:
+        this.pendingRecycler = new SizeFirstQueueRecycler(builder.pendingMaxMessages,
+            builder.overflowStrategy, builder.pendingKeepaliveNanos);
+    }
   }
 
   public static Builder builder(Sender sender) {
@@ -76,6 +83,7 @@ public class AsyncReporter implements Reporter, Flushable, Component {
     long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
     boolean strictOrder = false;
     Strategy overflowStrategy = DropHead;
+    String recycler = "sizefirst";
 
     Builder(Sender sender) {
       checkNotNull(sender, "sender");
@@ -130,6 +138,12 @@ public class AsyncReporter implements Reporter, Flushable, Component {
 
     public Builder overflowStrategy(Strategy overflowStrategy) {
       this.overflowStrategy = overflowStrategy;
+      return this;
+    }
+
+    public Builder recycler(String recycler) {
+      checkArgument(!Strings.isNullOrEmpty(recycler), "recycler must not be empty");
+      this.recycler = recycler;
       return this;
     }
 

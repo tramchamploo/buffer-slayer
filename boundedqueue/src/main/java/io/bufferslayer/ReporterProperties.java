@@ -3,7 +3,6 @@ package io.bufferslayer;
 import static io.bufferslayer.OverflowStrategy.Strategy.DropHead;
 
 import io.bufferslayer.AsyncReporter.Builder;
-import io.bufferslayer.ReporterMetricsExporter.Exporters;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -14,7 +13,7 @@ public class ReporterProperties {
   private Sender sender;
   private int senderThreads = 1;
   private String metrics = "noop";
-  private Exporters metricsExporter = Exporters.noop;
+  private String metricsExporter = "noop";
   private long messageTimeoutNanos = TimeUnit.SECONDS.toNanos(1);
   private long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
   private int flushThreads = 5;
@@ -22,6 +21,7 @@ public class ReporterProperties {
   private int pendingMaxMessages = 10000;
   private boolean strictOrder = false;
   private String overflowStrategy = DropHead.name();
+  private String recycler = "sizefirst";
 
   public Sender getSender() {
     return sender;
@@ -99,17 +99,11 @@ public class ReporterProperties {
   }
 
   public ReporterProperties setMetricsExporter(String exporter) {
-    if (exporter.equalsIgnoreCase(Exporters.http.name())) {
-      this.metricsExporter = Exporters.http;
-    } else if (exporter.equalsIgnoreCase(Exporters.log.name())) {
-      this.metricsExporter = Exporters.log;
-    } else {
-      throw new UnsupportedOperationException(exporter);
-    }
+    this.metricsExporter = exporter;
     return this;
   }
 
-  public Exporters getMetricsExporter() {
+  public String getMetricsExporter() {
     return this.metricsExporter;
   }
 
@@ -122,16 +116,25 @@ public class ReporterProperties {
     return strictOrder;
   }
 
+  public String getOverflowStrategy() {
+    return overflowStrategy;
+  }
+
   public ReporterProperties setOverflowStrategy(String overflowStrategy) {
     this.overflowStrategy = overflowStrategy;
     return this;
   }
 
-  public String getOverflowStrategy() {
-    return overflowStrategy;
+  public String getRecycler() {
+    return recycler;
   }
 
-  public AsyncReporter.Builder toBuilder() {
+  public ReporterProperties setRecycler(String recycler) {
+    this.recycler = recycler;
+    return this;
+  }
+
+  AsyncReporter.Builder toBuilder() {
     Builder builder = new Builder(sender)
         .senderThreads(senderThreads)
         .messageTimeout(messageTimeoutNanos, TimeUnit.NANOSECONDS)
@@ -140,7 +143,8 @@ public class ReporterProperties {
         .bufferedMaxMessages(bufferedMaxMessages)
         .pendingMaxMessages(pendingMaxMessages)
         .strictOrder(strictOrder)
-        .overflowStrategy(OverflowStrategy.create(overflowStrategy));
+        .overflowStrategy(OverflowStrategy.create(overflowStrategy))
+        .recycler(recycler);
     if (metrics.equalsIgnoreCase("inmemory")) {
       builder.metrics(InMemoryReporterMetrics
           .instance(ReporterMetricsExporter.of(metricsExporter)));

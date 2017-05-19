@@ -36,7 +36,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @State(Scope.Group)
-public class BatchedJdbcTemplateBenchmark {
+public class BatchJdbcTemplateBenchmark {
 
   private DriverManagerDataSource dataSource;
   private BatchJdbcTemplate batch;
@@ -150,7 +150,7 @@ public class BatchedJdbcTemplateBenchmark {
 
   public static void main(String[] args) throws RunnerException {
     Options opt = new OptionsBuilder()
-        .include(".*" + BatchedJdbcTemplateBenchmark.class.getSimpleName() + ".*")
+        .include(".*" + BatchJdbcTemplateBenchmark.class.getSimpleName() + ".*")
         .build();
 
     new Runner(opt).run();
