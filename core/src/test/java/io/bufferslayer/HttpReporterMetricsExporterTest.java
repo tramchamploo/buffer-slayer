@@ -30,8 +30,11 @@ public class HttpReporterMetricsExporterTest {
     assertEquals("application/json", response.header("Content-Type"));
 
     metrics.incrementMessages(1);
+    metrics.incrementMessagesDropped(2);
+    metrics.updateQueuedMessages(Message.STRICT_ORDER, 3);
     response = client.newCall(request).execute();
-    assertEquals("{\"messages\":1,\"messagesDropped\":0,\"queuedMessages\":0}",
+    assertEquals("{\"messages\":1,\"messagesDropped\":2,\"queuedMessages\":3}",
         response.body().string());
+    exporter.close();
   }
 }
