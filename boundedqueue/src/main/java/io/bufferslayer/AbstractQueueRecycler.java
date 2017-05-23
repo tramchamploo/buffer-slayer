@@ -38,6 +38,7 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
     this.pendingMaxMessages = pendingMaxMessages;
     this.overflowStrategy = overflowStrategy;
     this.pendingKeepaliveNanos = pendingKeepaliveNanos;
+    logger.info(getClass().getSimpleName() + " started.");
   }
 
   /**
