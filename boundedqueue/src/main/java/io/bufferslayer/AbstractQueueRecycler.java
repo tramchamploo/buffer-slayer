@@ -7,7 +7,6 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -28,10 +27,13 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
   final Strategy overflowStrategy;
   final long pendingKeepaliveNanos;
 
+  private Callback createCallback;
+
   private final Lock lock = new ReentrantLock();
 
-  AbstractQueueRecycler(int pendingMaxMessages, Strategy overflowStrategy,
-      long pendingKeepaliveNanos) {
+  AbstractQueueRecycler(int pendingMaxMessages,
+                        Strategy overflowStrategy,
+                        long pendingKeepaliveNanos) {
     this.keyToQueue = new ConcurrentHashMap<>();
     this.keyToLastGet = new ConcurrentHashMap<>();
 
@@ -39,6 +41,10 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
     this.overflowStrategy = overflowStrategy;
     this.pendingKeepaliveNanos = pendingKeepaliveNanos;
     logger.info(getClass().getSimpleName() + " started.");
+  }
+
+  interface Callback {
+    void call(SizeBoundedQueue queue);
   }
 
   /**
@@ -62,6 +68,7 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
           queue = new SizeBoundedQueue(pendingMaxMessages, overflowStrategy, key);
           keyToQueue.put(key, queue);
           recycle(queue);
+          onCreate(queue);
         }
       } finally {
         lock.unlock();
@@ -69,6 +76,15 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
     }
     keyToLastGet.put(key, now());
     return queue;
+  }
+
+  private void onCreate(SizeBoundedQueue queue) {
+    if (createCallback != null) createCallback.call(queue);
+  }
+
+  @Override
+  public void createCallback(Callback callback) {
+    createCallback = callback;
   }
 
   @Override

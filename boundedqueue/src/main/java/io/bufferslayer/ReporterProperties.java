@@ -16,7 +16,8 @@ public class ReporterProperties {
   private String metricsExporter = "noop";
   private long messageTimeoutNanos = TimeUnit.SECONDS.toNanos(1);
   private long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
-  private int flushThreads = 5;
+  private int flushThreads = 1;
+  private int timerThreads = AsyncReporter.DEFAULT_TIMER_THREADS;
   private int bufferedMaxMessages = 100;
   private int pendingMaxMessages = 10000;
   private boolean strictOrder = false;
@@ -80,6 +81,15 @@ public class ReporterProperties {
     return this;
   }
 
+  public int getTimerThreads() {
+    return timerThreads;
+  }
+
+  public ReporterProperties setTimerThreads(int timerThreads) {
+    this.timerThreads = timerThreads;
+    return this;
+  }
+
   public int getBufferedMaxMessages() {
     return bufferedMaxMessages;
   }
@@ -140,6 +150,7 @@ public class ReporterProperties {
         .messageTimeout(messageTimeoutNanos, TimeUnit.NANOSECONDS)
         .pendingKeepalive(pendingKeepaliveNanos, TimeUnit.NANOSECONDS)
         .flushThreads(flushThreads)
+        .timerThreads(timerThreads)
         .bufferedMaxMessages(bufferedMaxMessages)
         .pendingMaxMessages(pendingMaxMessages)
         .strictOrder(strictOrder)

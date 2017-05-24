@@ -28,38 +28,36 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void reportIfExceedTimeout() throws InterruptedException {
+  public void flushIfExceedTimeout() throws InterruptedException {
     FakeSender sender = new FakeSender();
     CountDownLatch countDown = new CountDownLatch(1);
     sender.onMessages(m -> countDown.countDown());
 
     reporter = AsyncReporter.builder(sender)
-        .metrics(metrics)
-        .pendingMaxMessages(10)
-        .bufferedMaxMessages(10)
-        .messageTimeout(100, TimeUnit.MILLISECONDS)
+        .pendingMaxMessages(2)
+        .bufferedMaxMessages(2)
+        .messageTimeout(10, TimeUnit.MILLISECONDS)
         .build();
     reporter.report(newMessage(0));
 
-    assertFalse(countDown.await(50, TimeUnit.MILLISECONDS));
-    assertTrue(countDown.await(60, TimeUnit.MILLISECONDS));
+    assertFalse(countDown.await(5, TimeUnit.MILLISECONDS));
+    assertTrue(countDown.await(30, TimeUnit.MILLISECONDS));
     assertEquals(0, sender.sent.get(0).key);
   }
 
   @Test
-  public void reportIfExceedMaxSize() throws InterruptedException {
+  public void flushIfExceedMaxSize() throws InterruptedException {
     FakeSender sender = new FakeSender();
     CountDownLatch countDown = new CountDownLatch(1);
     sender.onMessages(m -> countDown.countDown());
 
     reporter = AsyncReporter.builder(sender)
-        .metrics(metrics)
         .pendingMaxMessages(1)
         .bufferedMaxMessages(1)
         .messageTimeout(Integer.MAX_VALUE, TimeUnit.SECONDS)
         .build();
     reporter.report(newMessage(0));
-    countDown.await(10, TimeUnit.MILLISECONDS);
+    assertTrue(countDown.await(50, TimeUnit.MILLISECONDS));
     assertEquals(0, sender.sent.get(0).key);
   }
 
@@ -79,7 +77,7 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void strictOrdered_differentMessagesShareTheSameFlushThread() throws InterruptedException {
+  public void strictOrdered_differentMessagesShareSamePendingQueue() throws InterruptedException {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
@@ -95,7 +93,7 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void sameMessagesHaveShareTheSameFlushThread() throws InterruptedException {
+  public void sameMessagesHaveShareSamePendingQueue() throws InterruptedException {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
@@ -217,14 +215,14 @@ public class AsyncReporterTest {
 
     Iterator<Thread> iter = reporter.flushers.iterator();
     assertTrue(iter.hasNext());
-    assertEquals("AsyncReporter-0-flush-thread-0", iter.next().getName());
+    assertEquals("AsyncReporter-0-flusher-0", iter.next().getName());
 
     reporter = AsyncReporter.builder(sender).build();
     reporter.report(newMessage(0));
 
     iter = reporter.flushers.iterator();
     assertTrue(iter.hasNext());
-    assertEquals("AsyncReporter-1-flush-thread-0", iter.next().getName());
+    assertEquals("AsyncReporter-1-flusher-0", iter.next().getName());
   }
 
   @Test

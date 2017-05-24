@@ -1,5 +1,6 @@
 package io.bufferslayer;
 
+import io.bufferslayer.AbstractQueueRecycler.Callback;
 import io.bufferslayer.Message.MessageKey;
 import java.util.Collection;
 import java.util.List;
@@ -18,6 +19,12 @@ public interface QueueRecycler {
    * @return the queue
    */
   SizeBoundedQueue getOrCreate(MessageKey key);
+
+  /**
+   * set a callback for queue creation
+   * @param callback callback to trigger after a queue is created
+   */
+  void createCallback(Callback callback);
 
   /**
    * Lease a queue due to its priority

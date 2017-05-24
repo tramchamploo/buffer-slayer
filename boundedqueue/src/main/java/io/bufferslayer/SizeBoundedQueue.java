@@ -152,28 +152,12 @@ final class SizeBoundedQueue {
     }
   }
 
-  /**
-   * Blocks for up to nanosTimeout for elements to appear. Then, consume as many as possible.
-   */
-  int drainTo(Consumer consumer, long nanosTimeout) {
+  int drainTo(Consumer consumer) {
+    lock.lock();
     try {
-      // This may be called by multiple threads. If one is holding a lock, another is waiting. We
-      // use lockInterruptibly to ensure the one waiting can be interrupted.
-      lock.lockInterruptibly();
-      try {
-        long nanosLeft = nanosTimeout;
-        while (count == 0) {
-          if (nanosLeft <= 0) {
-            return 0;
-          }
-          nanosLeft = notEmpty.awaitNanos(nanosLeft);
-        }
-        return doDrain(consumer);
-      } finally {
-        lock.unlock();
-      }
-    } catch (InterruptedException e) {
-      return 0;
+      return doDrain(consumer);
+    } finally {
+      lock.unlock();
     }
   }
 
@@ -234,5 +218,14 @@ final class SizeBoundedQueue {
       notFull.signal();
     }
     return drainedCount;
+  }
+
+  int size() {
+    try {
+      lock.lock();
+      return count;
+    } finally {
+      lock.unlock();
+    }
   }
 }

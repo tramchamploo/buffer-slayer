@@ -29,9 +29,16 @@ final class SenderToAsyncSenderAdaptor<M extends Message, R> implements AsyncSen
     this.delegate = checkNotNull(delegate);
     checkArgument(senderThreads > 0, "senderThreads > 0: %s", senderThreads);
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setNameFormat("AsyncReporter-" + reporterId + "-sender-%d").build();
-    this.executor = new ThreadPoolExecutor(senderThreads, senderThreads, 0, TimeUnit.MILLISECONDS,
-        new SynchronousQueue<Runnable>(), threadFactory, new CallerRunsPolicy());
+        .setNameFormat("AsyncReporter-" + reporterId + "-sender-%d")
+        .setDaemon(true)
+        .build();
+    this.executor = new ThreadPoolExecutor(senderThreads,
+        senderThreads,
+        0,
+        TimeUnit.MILLISECONDS,
+        new SynchronousQueue<Runnable>(),
+        threadFactory,
+        new CallerRunsPolicy());
   }
 
   @Override

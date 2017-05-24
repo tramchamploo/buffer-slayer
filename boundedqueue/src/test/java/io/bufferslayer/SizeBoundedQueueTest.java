@@ -163,7 +163,7 @@ public class SizeBoundedQueueTest {
       countDown.countDown();
     }).start();
     assertFalse(countDown.await(5, TimeUnit.MILLISECONDS));
-    queue.drainTo(next -> true, 0);
+    queue.drainTo(next -> true);
     assertTrue(countDown.await(5, TimeUnit.MILLISECONDS));
   }
 
@@ -178,7 +178,7 @@ public class SizeBoundedQueueTest {
     for (byte i = 0; i < 15; i++) {
       Message next = newMessage(i);
       queue.offer(next, newDeferred(next));
-      queue.drainTo(consumer, 1);
+      queue.drainTo(consumer);
     }
 
     // ensure we have all dropped the elements
@@ -193,7 +193,7 @@ public class SizeBoundedQueueTest {
   private Object[] collectKeys(SizeBoundedQueue queue) {
     List<Message> polled = new ArrayList<>();
     SizeBoundedQueue.Consumer consumer = polled::add;
-    queue.drainTo(consumer, 1);
+    queue.drainTo(consumer);
     return polled.stream()
         .map(m -> ((TestMessage) m).key)
         .collect(Collectors.toList())

@@ -9,18 +9,15 @@ import java.util.List;
 final class BufferNextMessage implements SizeBoundedQueue.Consumer {
 
   private final int maxSize;
-  private final long timeoutNanos;
   private final boolean onlyAcceptSame;
   private final List<Message> buffer = new LinkedList<>();
 
-  long deadlineNanoTime;
   boolean bufferFull;
   Message.MessageKey lastMessageKey;
   boolean ofTheSameKey = true;
 
-  BufferNextMessage(int maxSize, long timeoutNanos, boolean onlyAcceptSame) {
+  BufferNextMessage(int maxSize, boolean onlyAcceptSame) {
     this.maxSize = maxSize;
-    this.timeoutNanos = timeoutNanos;
     this.onlyAcceptSame = onlyAcceptSame;
   }
 
@@ -43,17 +40,6 @@ final class BufferNextMessage implements SizeBoundedQueue.Consumer {
     return true;
   }
 
-  long remainingNanos() {
-    if (buffer.isEmpty()) {
-      deadlineNanoTime = System.nanoTime() + timeoutNanos;
-    }
-    return Math.max(deadlineNanoTime - System.nanoTime(), 0);
-  }
-
-  boolean isReady() {
-    return bufferFull || !ofTheSameKey || remainingNanos() <= 0;
-  }
-
   List<Message> drain() {
     if (buffer.isEmpty()) {
       return Collections.emptyList();
@@ -61,7 +47,6 @@ final class BufferNextMessage implements SizeBoundedQueue.Consumer {
     ArrayList<Message> result = new ArrayList<>(buffer);
     buffer.clear();
     bufferFull = false;
-    deadlineNanoTime = 0;
     lastMessageKey = null;
     ofTheSameKey = true;
     return result;
