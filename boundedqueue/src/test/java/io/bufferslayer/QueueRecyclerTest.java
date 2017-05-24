@@ -5,10 +5,12 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 
+import io.bufferslayer.AbstractQueueRecycler.Callback;
 import io.bufferslayer.Message.MessageKey;
 import java.util.LinkedList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.jdeferred.impl.DeferredObject;
 import org.junit.Test;
 
@@ -29,6 +31,26 @@ public abstract class QueueRecyclerTest {
     QueueRecycler recycler = newRecycler();
     SizeBoundedQueue q = recycler.getOrCreate(Message.STRICT_ORDER);
     assertEquals(q, recycler.getOrCreate(Message.STRICT_ORDER));
+  }
+
+  @Test
+  public void callbackTriggeredAfterCreated() throws InterruptedException {
+    QueueRecycler recycler = newRecycler();
+    CountDownLatch countDown = new CountDownLatch(1);
+    AtomicInteger callCount = new AtomicInteger();
+    recycler.createCallback(new Callback() {
+      @Override
+      public void call(SizeBoundedQueue queue) {
+        assertEquals(Message.STRICT_ORDER, queue.key);
+        callCount.incrementAndGet();
+        countDown.countDown();
+      }
+    });
+    recycler.getOrCreate(Message.STRICT_ORDER);
+    countDown.await();
+    recycler.getOrCreate(Message.STRICT_ORDER);
+    // only triggered once created
+    assertEquals(1, callCount.get());
   }
 
   @Test
@@ -102,7 +124,7 @@ public abstract class QueueRecyclerTest {
     assertEquals(0, recycler.shrink().size());
     recycler.recycle(queue);
     assertEquals(queue, recycler.lease(1, TimeUnit.MILLISECONDS));
-    queue.drainTo(next -> true, 1);
+    queue.drainTo(next -> true);
     assertNull(recycler.lease(1, TimeUnit.MILLISECONDS));
   }
 }

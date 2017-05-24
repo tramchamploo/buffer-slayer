@@ -117,7 +117,7 @@ public class SizeBoundedQueueBenchmark {
       counters.drained++;
       DeferredHolder.resolve(next.id, null);
       return true;
-    }, 1000);
+    });
   }
 
   @Benchmark @Group("mild_contention") @GroupThreads(2)
@@ -132,7 +132,7 @@ public class SizeBoundedQueueBenchmark {
       counters.drained++;
       DeferredHolder.resolve(next.id, null);
       return true;
-    }, 1000);
+    });
   }
 
   @Benchmark @Group("high_contention") @GroupThreads(8)
@@ -147,7 +147,7 @@ public class SizeBoundedQueueBenchmark {
       counters.drained++;
       DeferredHolder.resolve(next.id, null);
       return true;
-    }, 1000);
+    });
   }
 
   public static void main(String[] args) throws RunnerException {

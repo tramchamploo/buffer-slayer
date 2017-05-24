@@ -1,5 +1,6 @@
 package io.bufferslayer;
 
+import static io.bufferslayer.OverflowStrategy.Strategy.Block;
 import static io.bufferslayer.OverflowStrategy.Strategy.DropBuffer;
 import static io.bufferslayer.OverflowStrategy.Strategy.DropHead;
 import static io.bufferslayer.OverflowStrategy.Strategy.DropNew;
@@ -26,6 +27,7 @@ public class OverflowStrategyTest {
     assertEquals(DropTail, create("DROPTAIL"));
     assertEquals(DropNew, create("DROPNEW"));
     assertEquals(DropBuffer, create("DROPBUFFER"));
+    assertEquals(Block, create("block"));
     assertEquals(Fail, create("FAIL"));
   }
 }
