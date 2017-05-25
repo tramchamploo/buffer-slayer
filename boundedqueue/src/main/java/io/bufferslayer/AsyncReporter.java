@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
  */
 public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, Flushable, Component {
 
-  private static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
+  static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
   static final int DEFAULT_TIMER_THREADS = Runtime.getRuntime().availableProcessors();
 
   static AtomicLong idGenerator = new AtomicLong();
@@ -51,6 +51,7 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
   final int flushThreads;
   final FlushThreadFactory flushThreadFactory;
   final CopyOnWriteArraySet<Thread> flushers = new CopyOnWriteArraySet<>();
+  final FlushSynchronizer synchronizer = new FlushSynchronizer();
   final QueueRecycler pendingRecycler;
   final AtomicBoolean started = new AtomicBoolean(false);
   final AtomicBoolean closed = new AtomicBoolean(false);
@@ -65,18 +66,21 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
     this.bufferedMaxMessages = builder.bufferedMaxMessages;
     this.strictOrder = builder.strictOrder;
     this.flushThreads = builder.flushThreads;
-    this.flushThreadFactory = new FlushThreadFactory(this);
     this.pendingRecycler = builder.recycler.equalsIgnoreCase("roundrobin") ?
         new RoundRobinQueueRecycler(builder.pendingMaxMessages, builder.overflowStrategy,
             builder.pendingKeepaliveNanos) :
         new SizeFirstQueueRecycler(builder.pendingMaxMessages, builder.overflowStrategy,
             builder.pendingKeepaliveNanos);
+    this.flushThreadFactory = new FlushThreadFactory(this);
     if (messageTimeoutNanos > 0) {
       ThreadFactory timerFactory = new ThreadFactoryBuilder()
-          .setNameFormat("AsyncReporter-" + id + "-timer-%d")
-          .setDaemon(true)
-          .build();
-      this.scheduler = new ScheduledThreadPoolExecutor(builder.timerThreads, timerFactory);
+                                      .setNameFormat("AsyncReporter-" + id + "-timer-%d")
+                                      .setDaemon(true)
+                                      .build();
+      ScheduledThreadPoolExecutor timerPool = new ScheduledThreadPoolExecutor(
+          builder.timerThreads, timerFactory);
+      timerPool.setRemoveOnCancelPolicy(true);
+      this.scheduler = timerPool;
       this.pendingRecycler.createCallback(new Callback() {
         @Override
         public void call(SizeBoundedQueue queue) {
@@ -211,6 +215,8 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
     SizeBoundedQueue pending = pendingRecycler.getOrCreate(key);
     Deferred<Object, MessageDroppedException, Integer> deferred = newDeferred(message.id);
     pending.offer(message, deferred);
+    if (pending.size() >= bufferedMaxMessages)
+      synchronizer.notifyOne();
     return deferred.promise().fail(metricsCallback());
   }
 
@@ -258,9 +264,11 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
           .resolve(emptyList())
           .promise();
     }
+    if (drained >= bufferedMaxMessages) {
+      synchronizer.finish();
+    }
     // Update metrics
     metrics.updateQueuedMessages(pending.key, pending.count);
-    // Consumer should be ready to drain
     final List<Message> messages = buffer.drain();
     Promise<List<?>, MessageDroppedException, ?> promise = sender.send(messages);
     addCallbacks(messages, promise);

@@ -221,8 +221,8 @@ final class SizeBoundedQueue {
   }
 
   int size() {
+    lock.lock();
     try {
-      lock.lock();
       return count;
     } finally {
       lock.unlock();
