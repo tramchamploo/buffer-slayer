@@ -2,11 +2,13 @@ package io.bufferslayer;
 
 import io.bufferslayer.Message.MessageKey;
 import io.bufferslayer.OverflowStrategy.Strategy;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -34,8 +36,8 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
   AbstractQueueRecycler(int pendingMaxMessages,
                         Strategy overflowStrategy,
                         long pendingKeepaliveNanos) {
-    this.keyToQueue = new ConcurrentHashMap<>();
-    this.keyToLastGet = new ConcurrentHashMap<>();
+    this.keyToQueue = new HashMap<>();
+    this.keyToLastGet = new HashMap<>();
 
     this.pendingMaxMessages = pendingMaxMessages;
     this.overflowStrategy = overflowStrategy;
@@ -57,24 +59,20 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
 
   @Override
   public SizeBoundedQueue getOrCreate(MessageKey key) {
-    SizeBoundedQueue queue = keyToQueue.get(key);
-    if (queue == null) {
-      // race condition initializing pending queue
-      try {
-        lock.lock();
-        queue = keyToQueue.get(key);
-        if (queue == null) {
-          queue = new SizeBoundedQueue(pendingMaxMessages, overflowStrategy, key);
-          keyToQueue.put(key, queue);
-          recycle(queue);
-          onCreate(queue);
-        }
-      } finally {
-        lock.unlock();
+    lock.lock();
+    try {
+      SizeBoundedQueue queue = keyToQueue.get(key);
+      if (queue == null) {
+        queue = new SizeBoundedQueue(pendingMaxMessages, overflowStrategy, key);
+        keyToQueue.put(key, queue);
+        recycle(queue);
+        onCreate(queue);
       }
+      keyToLastGet.put(key, now());
+      return queue;
+    } finally {
+      lock.unlock();
     }
-    keyToLastGet.put(key, now());
-    return queue;
   }
 
   private void onCreate(SizeBoundedQueue queue) {
@@ -98,9 +96,16 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
 
   @Override
   public void recycle(SizeBoundedQueue queue) {
-    if (queue != null && // offer only when not dead
-        (keyToQueue.containsValue(queue) || queue.count > 0)) {
-      recycler().offer(queue);
+    if (queue != null) {
+      lock.lock();
+      try {
+        // offer only when not dead
+        if (keyToQueue.containsValue(queue) || queue.count > 0) {
+          recycler().offer(queue);
+        }
+      } finally {
+        lock.unlock();
+      }
     }
   }
 
@@ -115,33 +120,46 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
   public LinkedList<MessageKey> shrink() {
     LinkedList<MessageKey> result = new LinkedList<>();
 
-    for (MessageKey next : keyToLastGet.keySet()) {
-      if (now() - getOrDefault(keyToLastGet, next, now()) > pendingKeepaliveNanos) {
-        try {
-          lock.lock();
+    lock.lock();
+    try {
+      for (Iterator<MessageKey> iter = keyToLastGet.keySet().iterator(); iter.hasNext(); ) {
+        MessageKey next = iter.next();
+        if (now() - getOrDefault(keyToLastGet, next, now()) > pendingKeepaliveNanos) {
           SizeBoundedQueue q = keyToQueue.get(next);
           if (q == null || q.count > 0) continue;
-          keyToLastGet.remove(next);
+
+          iter.remove();
           keyToQueue.remove(next);
           recycler().remove(q);
           result.add(next);
-        } finally {
-          lock.unlock();
         }
       }
+    } finally {
+      lock.unlock();
     }
     return result;
   }
 
   @Override
   public void clear() {
-    keyToQueue.clear();
-    keyToLastGet.clear();
-    recycler().clear();
+    lock.lock();
+    try {
+      keyToQueue.clear();
+      keyToLastGet.clear();
+      recycler().clear();
+    } finally {
+      lock.unlock();
+    }
   }
 
   @Override
   public Collection<SizeBoundedQueue> elements() {
-    return keyToQueue.values();
+    lock.lock();
+    try {
+      // return a copy here to avoid modification while traversing
+      return new ArrayList<>(keyToQueue.values());
+    } finally {
+      lock.unlock();
+    }
   }
 }

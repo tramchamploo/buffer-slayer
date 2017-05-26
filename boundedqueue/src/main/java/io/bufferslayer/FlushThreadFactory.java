@@ -34,7 +34,9 @@ class FlushThreadFactory {
         try {
           while (!reporter.closed.get()) {
             try {
+              // wait when no queue is ready
               synchronizer.await(reporter.messageTimeoutNanos);
+              // flush until no queue is ready
               while (synchronizer.remaining() > 0) {
                 SizeBoundedQueue q = leaseQueue();
                 if (q == null) continue;
@@ -45,8 +47,9 @@ class FlushThreadFactory {
             }
           }
         } finally {
-          if (reporter.closed.get()) // wake up notice thread
+          if (reporter.closed.get()) { // wake up notice thread
             reporter.close.countDown();
+          }
         }
       }
     });
@@ -59,10 +62,12 @@ class FlushThreadFactory {
   private void reScheduleAndFlush(SizeBoundedQueue q) {
     try {
       if (q.size() >= reporter.bufferedMaxMessages) {
+        // cancel timer on the queue and reschedule
         if (reporter.scheduler != null) {
           reporter.schedulePeriodically(q.key, reporter.messageTimeoutNanos);
         }
-        reporter.flush(q);
+        // flush until queue size is less then bufferedMaxMessages
+        while (q.size() >= reporter.bufferedMaxMessages) reporter.flush(q);
       }
     } finally {
       recycler.recycle(q);

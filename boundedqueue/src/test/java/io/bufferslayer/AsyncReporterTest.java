@@ -56,9 +56,16 @@ public class AsyncReporterTest {
         .bufferedMaxMessages(1)
         .messageTimeout(Integer.MAX_VALUE, TimeUnit.SECONDS)
         .build();
-    reporter.report(newMessage(0));
+    TestMessage message = newMessage(0);
+    reporter.report(message);
     assertTrue(countDown.await(50, TimeUnit.MILLISECONDS));
     assertEquals(0, sender.sent.get(0).key);
+    // make sure the queue is recycled
+    assertEquals(message.asMessageKey(), reporter.pendingRecycler
+        .lease(10, TimeUnit.MILLISECONDS)
+        .key);
+    // and the ready state is cleared
+    assertFalse(reporter.synchronizer.isReady());
   }
 
   @Test

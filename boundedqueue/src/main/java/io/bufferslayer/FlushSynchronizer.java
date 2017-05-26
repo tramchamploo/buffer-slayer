@@ -1,6 +1,7 @@
 package io.bufferslayer;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -10,38 +11,50 @@ import java.util.concurrent.locks.ReentrantLock;
  * <p>Flush threads should block when no pending queue has more elements
  * than {@code bufferedMaxMessages}.
  */
-class FlushSynchronizer {
+class FlushSynchronizer<K> {
 
   private final Lock lock = new ReentrantLock();
   private final Condition available = lock.newCondition();
-  private final AtomicInteger ready = new AtomicInteger();
+
+  private static final Object READY = new Object();
+  private final Map<K, Object> keyToReady = new HashMap<>();
 
   boolean isReady() {
     return remaining() > 0;
   }
 
-  void notifyOne() {
+  void notifyOne(K key) {
     lock.lock();
     try {
-      ready.incrementAndGet();
-      available.signal();
+      if (!keyToReady.containsKey(key)) {
+        keyToReady.put(key, READY);
+        available.signal();
+      }
     } finally {
       lock.unlock();
     }
   }
 
-  int finish() {
-    int last = ready.get();
-    while (last > 0) {
-      int update = last - 1;
-      if (ready.compareAndSet(last, update)) return update;
-      last = ready.get();
+  void finish(K key) {
+    if (keyToReady.containsKey(key)) {
+      lock.lock();
+      try {
+        if (keyToReady.containsKey(key)) {
+          keyToReady.remove(key);
+        }
+      } finally {
+        lock.unlock();
+      }
     }
-    return last;
   }
 
   int remaining() {
-    return ready.get();
+    lock.lock();
+    try {
+      return keyToReady.size();
+    } finally {
+      lock.unlock();
+    }
   }
 
   void await(long timeoutNanos) throws InterruptedException {

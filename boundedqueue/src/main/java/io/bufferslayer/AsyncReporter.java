@@ -51,7 +51,7 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
   final int flushThreads;
   final FlushThreadFactory flushThreadFactory;
   final CopyOnWriteArraySet<Thread> flushers = new CopyOnWriteArraySet<>();
-  final FlushSynchronizer synchronizer = new FlushSynchronizer();
+  final FlushSynchronizer<MessageKey> synchronizer = new FlushSynchronizer<>();
   final QueueRecycler pendingRecycler;
   final AtomicBoolean started = new AtomicBoolean(false);
   final AtomicBoolean closed = new AtomicBoolean(false);
@@ -203,6 +203,7 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
       deferred.reject(dropped(new IllegalStateException("closed!"), singletonList(message)));
       return deferred.promise();
     }
+
     // Lazy initialize flush threads
     if (messageTimeoutNanos > 0 &&
         started.compareAndSet(false, true)) {
@@ -211,12 +212,13 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
     // If strictOrder is true, ignore original message key.
     Message.MessageKey key = message.asMessageKey();
     key = strictOrder ? Message.STRICT_ORDER : key;
+
     // Offer message to pending queue.
     SizeBoundedQueue pending = pendingRecycler.getOrCreate(key);
     Deferred<Object, MessageDroppedException, Integer> deferred = newDeferred(message.id);
     pending.offer(message, deferred);
     if (pending.size() >= bufferedMaxMessages)
-      synchronizer.notifyOne();
+      synchronizer.notifyOne(key);
     return deferred.promise().fail(metricsCallback());
   }
 
@@ -264,8 +266,9 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
           .resolve(emptyList())
           .promise();
     }
-    if (drained >= bufferedMaxMessages) {
-      synchronizer.finish();
+    if (drained >= bufferedMaxMessages &&
+        pending.size() < bufferedMaxMessages) {
+      synchronizer.finish(pending.key);
     }
     // Update metrics
     metrics.updateQueuedMessages(pending.key, pending.count);
