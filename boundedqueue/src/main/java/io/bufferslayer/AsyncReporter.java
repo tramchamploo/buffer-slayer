@@ -8,11 +8,10 @@ import static io.bufferslayer.OverflowStrategy.Strategy.DropHead;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
-import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.bufferslayer.AbstractQueueRecycler.Callback;
 import io.bufferslayer.Message.MessageKey;
 import io.bufferslayer.OverflowStrategy.Strategy;
+import io.bufferslayer.QueueManager.Callback;
 import io.bufferslayer.internal.Component;
 import java.io.Flushable;
 import java.util.Collection;
@@ -51,8 +50,8 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
   final int flushThreads;
   final FlushThreadFactory flushThreadFactory;
   final CopyOnWriteArraySet<Thread> flushers = new CopyOnWriteArraySet<>();
-  final FlushSynchronizer<MessageKey> synchronizer = new FlushSynchronizer<>();
-  final QueueRecycler pendingRecycler;
+  final FlushSynchronizer synchronizer = new FlushSynchronizer();
+  final QueueManager queueManager;
   final AtomicBoolean started = new AtomicBoolean(false);
   final AtomicBoolean closed = new AtomicBoolean(false);
   CountDownLatch close;
@@ -66,22 +65,19 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
     this.bufferedMaxMessages = builder.bufferedMaxMessages;
     this.strictOrder = builder.strictOrder;
     this.flushThreads = builder.flushThreads;
-    this.pendingRecycler = builder.recycler.equalsIgnoreCase("roundrobin") ?
-        new RoundRobinQueueRecycler(builder.pendingMaxMessages, builder.overflowStrategy,
-            builder.pendingKeepaliveNanos) :
-        new SizeFirstQueueRecycler(builder.pendingMaxMessages, builder.overflowStrategy,
-            builder.pendingKeepaliveNanos);
+    this.queueManager = new QueueManager(builder.pendingMaxMessages,
+        builder.overflowStrategy, builder.pendingKeepaliveNanos);
     this.flushThreadFactory = new FlushThreadFactory(this);
     if (messageTimeoutNanos > 0) {
       ThreadFactory timerFactory = new ThreadFactoryBuilder()
                                       .setNameFormat("AsyncReporter-" + id + "-timer-%d")
                                       .setDaemon(true)
                                       .build();
-      ScheduledThreadPoolExecutor timerPool = new ScheduledThreadPoolExecutor(
-          builder.timerThreads, timerFactory);
+      ScheduledThreadPoolExecutor timerPool =
+          new ScheduledThreadPoolExecutor(builder.timerThreads, timerFactory);
       timerPool.setRemoveOnCancelPolicy(true);
       this.scheduler = timerPool;
-      this.pendingRecycler.createCallback(new Callback() {
+      this.queueManager.createCallback(new Callback() {
         @Override
         public void call(SizeBoundedQueue queue) {
           schedulePeriodically(queue.key, messageTimeoutNanos);
@@ -107,7 +103,6 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
     long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
     boolean strictOrder = false;
     Strategy overflowStrategy = DropHead;
-    String recycler = "sizefirst";
 
     Builder(Sender sender) {
       checkNotNull(sender, "sender");
@@ -171,12 +166,6 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
       return this;
     }
 
-    public Builder recycler(String recycler) {
-      checkArgument(!Strings.isNullOrEmpty(recycler), "recycler must not be empty");
-      this.recycler = recycler;
-      return this;
-    }
-
     public AsyncReporter build() {
       return new AsyncReporter(this);
     }
@@ -184,8 +173,8 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
 
   @Override
   protected void onTimer(MessageKey timerKey) {
-    SizeBoundedQueue q = pendingRecycler.getOrCreate(timerKey);
-    if (q.size() > 0) flush(q);
+    SizeBoundedQueue q = queueManager.get(timerKey);
+    if (q != null && q.size() > 0) flush(q);
   }
 
   @Override
@@ -214,11 +203,11 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
     key = strictOrder ? Message.STRICT_ORDER : key;
 
     // Offer message to pending queue.
-    SizeBoundedQueue pending = pendingRecycler.getOrCreate(key);
+    SizeBoundedQueue pending = queueManager.getOrCreate(key);
     Deferred<Object, MessageDroppedException, Integer> deferred = newDeferred(message.id);
     pending.offer(message, deferred);
     if (pending.size() >= bufferedMaxMessages)
-      synchronizer.notifyOne(key);
+      synchronizer.offer(pending);
     return deferred.promise().fail(metricsCallback());
   }
 
@@ -245,7 +234,7 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
   @Override
   public void flush() {
     try {
-      for (SizeBoundedQueue pending : pendingRecycler.elements()) {
+      for (SizeBoundedQueue pending : queueManager.elements()) {
         Promise<List<?>, MessageDroppedException, ?> promise = flush(pending);
         promise.waitSafely();
       }
@@ -259,16 +248,16 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
     BufferNextMessage buffer = new BufferNextMessage(bufferedMaxMessages, strictOrder);
     int drained = pending.drainTo(buffer);
     // Remove overtime queues and relative metrics and timer
-    List<MessageKey> shrinked = pendingRecycler.shrink();
+    List<MessageKey> shrinked = queueManager.shrink();
     clearMetricsAndTimer(shrinked);
     if (drained == 0) {
       return new DeferredObject<List<?>, MessageDroppedException, Object>()
           .resolve(emptyList())
           .promise();
     }
-    if (drained >= bufferedMaxMessages &&
+    if (drained == bufferedMaxMessages &&
         pending.size() < bufferedMaxMessages) {
-      synchronizer.finish(pending.key);
+      synchronizer.release(pending);
     }
     // Update metrics
     metrics.updateQueuedMessages(pending.key, pending.count);
@@ -342,11 +331,11 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
 
   private void clearPendings() {
     int count = 0;
-    for (SizeBoundedQueue q : pendingRecycler.elements()) {
+    for (SizeBoundedQueue q : queueManager.elements()) {
       count += q.clear();
       metrics.removeQueuedMessages(q.key);
     }
-    pendingRecycler.clear();
+    queueManager.clear();
     if (count > 0) {
       metrics.incrementMessagesDropped(count);
       logger.warn("Dropped " + count + " messages due to AsyncReporter.close()");

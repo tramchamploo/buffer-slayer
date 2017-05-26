@@ -22,7 +22,6 @@ public class ReporterProperties {
   private int pendingMaxMessages = 10000;
   private boolean strictOrder = false;
   private String overflowStrategy = DropHead.name();
-  private String recycler = "sizefirst";
 
   public Sender getSender() {
     return sender;
@@ -135,15 +134,6 @@ public class ReporterProperties {
     return this;
   }
 
-  public String getRecycler() {
-    return recycler;
-  }
-
-  public ReporterProperties setRecycler(String recycler) {
-    this.recycler = recycler;
-    return this;
-  }
-
   AsyncReporter.Builder toBuilder() {
     Builder builder = new Builder(sender)
         .senderThreads(senderThreads)
@@ -154,8 +144,7 @@ public class ReporterProperties {
         .bufferedMaxMessages(bufferedMaxMessages)
         .pendingMaxMessages(pendingMaxMessages)
         .strictOrder(strictOrder)
-        .overflowStrategy(OverflowStrategy.create(overflowStrategy))
-        .recycler(recycler);
+        .overflowStrategy(OverflowStrategy.create(overflowStrategy));
     if (metrics.equalsIgnoreCase("inmemory")) {
       builder.metrics(InMemoryReporterMetrics
           .instance(ReporterMetricsExporter.of(metricsExporter)));

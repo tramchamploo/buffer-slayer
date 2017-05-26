@@ -182,7 +182,7 @@ public class BatchJdbcTemplateTest {
     for (int i = 0; i < 2; i++) {
       batchJdbcTemplate.update("INSERT INTO test(data, time) VALUES ('data', now())");
     }
-    assertEquals(1, reporter.pendingRecycler.elements().size());
+    assertEquals(1, reporter.queueManager.elements().size());
 
     Thread.sleep(1000);
     int rowCount = batchJdbcTemplate.queryForObject("SELECT COUNT(1) FROM test;", Integer.class);
@@ -202,7 +202,7 @@ public class BatchJdbcTemplateTest {
     for (int i = 0; i < 2; i++) {
       batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()});
     }
-    assertEquals(1, reporter.pendingRecycler.elements().size());
+    assertEquals(1, reporter.queueManager.elements().size());
   }
 
   @Test
@@ -217,7 +217,7 @@ public class BatchJdbcTemplateTest {
 
     batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()});
     batchJdbcTemplate.update(MODIFICATION, new Object[]{randomString()});
-    assertEquals(2, reporter.pendingRecycler.elements().size());
+    assertEquals(2, reporter.queueManager.elements().size());
   }
 
   @Test

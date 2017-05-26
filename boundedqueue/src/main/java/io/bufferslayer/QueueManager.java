@@ -8,8 +8,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
@@ -17,8 +15,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Created by tramchamploo on 2017/5/19.
+ * Manages {@link SizeBoundedQueue}'s lifecycle
  */
-abstract class AbstractQueueRecycler implements QueueRecycler {
+class QueueManager {
 
   private final Logger logger = LoggerFactory.getLogger(getClass());
 
@@ -33,9 +32,9 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
 
   private final Lock lock = new ReentrantLock();
 
-  AbstractQueueRecycler(int pendingMaxMessages,
-                        Strategy overflowStrategy,
-                        long pendingKeepaliveNanos) {
+  QueueManager(int pendingMaxMessages,
+               Strategy overflowStrategy,
+               long pendingKeepaliveNanos) {
     this.keyToQueue = new HashMap<>();
     this.keyToLastGet = new HashMap<>();
 
@@ -48,25 +47,40 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
     void call(SizeBoundedQueue queue);
   }
 
-  /**
-   * recycler used to lease and recycle
-   */
-  abstract BlockingQueue<SizeBoundedQueue> recycler();
-
   private static long now() {
     return System.nanoTime();
   }
 
-  @Override
-  public SizeBoundedQueue getOrCreate(MessageKey key) {
+  /**
+   * Get a queue by message key
+   *
+   * @param key message key related to the queue
+   * @return the queue if existed otherwise null
+   */
+  SizeBoundedQueue get(MessageKey key) {
+    lock.lock();
+    try {
+      return keyToQueue.get(key);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Get a queue by message key if exists otherwise create one
+   *
+   * @param key message key related to the queue
+   * @return the queue
+   */
+  SizeBoundedQueue getOrCreate(MessageKey key) {
     lock.lock();
     try {
       SizeBoundedQueue queue = keyToQueue.get(key);
       if (queue == null) {
         queue = new SizeBoundedQueue(pendingMaxMessages, overflowStrategy, key);
         keyToQueue.put(key, queue);
-        recycle(queue);
         onCreate(queue);
+        logger.info("Queue created, key: {}", key);
       }
       keyToLastGet.put(key, now());
       return queue;
@@ -79,45 +93,18 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
     if (createCallback != null) createCallback.call(queue);
   }
 
-  @Override
-  public void createCallback(Callback callback) {
+  /**
+   * set a callback for queue creation
+   * @param callback callback to trigger after a queue is created
+   */
+  void createCallback(Callback callback) {
     createCallback = callback;
   }
 
-  @Override
-  public SizeBoundedQueue lease(long timeout, TimeUnit unit) {
-    try {
-      return recycler().poll(timeout, unit);
-    } catch (InterruptedException e) {
-      logger.error("Interrupted leasing queue.", e);
-    }
-    return null;
-  }
-
-  @Override
-  public void recycle(SizeBoundedQueue queue) {
-    if (queue != null) {
-      lock.lock();
-      try {
-        // offer only when not dead
-        if (keyToQueue.containsKey(queue.key) || queue.count > 0) {
-          recycler().offer(queue);
-        }
-      } finally {
-        lock.unlock();
-      }
-    }
-  }
-
-  static Long getOrDefault(Map<MessageKey, Long> map, MessageKey key, Long defaultValue) {
-    Long v;
-    return (((v = map.get(key)) != null) || map.containsKey(key))
-        ? v
-        : defaultValue;
-  }
-
-  @Override
-  public LinkedList<MessageKey> shrink() {
+  /**
+   * Drop queues which exceed its keepalive
+   */
+  LinkedList<MessageKey> shrink() {
     LinkedList<MessageKey> result = new LinkedList<>();
 
     lock.lock();
@@ -130,30 +117,42 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
 
           iter.remove();
           keyToQueue.remove(next);
-          recycler().remove(q);
           result.add(next);
         }
       }
     } finally {
       lock.unlock();
     }
+    if (!result.isEmpty()) {
+      logger.info("Timeout queues removed, keys: {}", result);
+    }
     return result;
   }
 
-  @Override
-  public void clear() {
+  static Long getOrDefault(Map<MessageKey, Long> map, MessageKey key, Long defaultValue) {
+    Long v;
+    return (((v = map.get(key)) != null) || map.containsKey(key))
+        ? v
+        : defaultValue;
+  }
+
+  /**
+   * Clear everything
+   */
+  void clear() {
     lock.lock();
     try {
       keyToQueue.clear();
       keyToLastGet.clear();
-      recycler().clear();
     } finally {
       lock.unlock();
     }
   }
 
-  @Override
-  public Collection<SizeBoundedQueue> elements() {
+  /**
+   * Get all queues
+   */
+  Collection<SizeBoundedQueue> elements() {
     lock.lock();
     try {
       // return a copy here to avoid modification while traversing

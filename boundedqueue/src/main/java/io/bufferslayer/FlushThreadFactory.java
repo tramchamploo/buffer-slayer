@@ -2,7 +2,6 @@ package io.bufferslayer;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 
 /**
@@ -14,13 +13,11 @@ class FlushThreadFactory {
 
   final AsyncReporter reporter;
   final FlushSynchronizer synchronizer;
-  final QueueRecycler recycler;
   final ThreadFactory factory;
 
   FlushThreadFactory(AsyncReporter reporter) {
     this.reporter = reporter;
     this.synchronizer = reporter.synchronizer;
-    this.recycler = reporter.pendingRecycler;
     this.factory = new ThreadFactoryBuilder()
         .setNameFormat("AsyncReporter-" + reporter.id + "-flusher-%d")
         .setDaemon(true)
@@ -35,13 +32,9 @@ class FlushThreadFactory {
           while (!reporter.closed.get()) {
             try {
               // wait when no queue is ready
-              synchronizer.await(reporter.messageTimeoutNanos);
-              // flush until no queue is ready
-              while (synchronizer.remaining() > 0) {
-                SizeBoundedQueue q = leaseQueue();
-                if (q == null) continue;
-                reScheduleAndFlush(q);
-              }
+              SizeBoundedQueue q = synchronizer.poll(reporter.messageTimeoutNanos);
+              if (q == null) continue;
+              reScheduleAndFlush(q);
             } catch (InterruptedException e) {
               logger.error("Interrupted waiting for a ready queue.");
             }
@@ -55,22 +48,14 @@ class FlushThreadFactory {
     });
   }
 
-  private SizeBoundedQueue leaseQueue() {
-    return recycler.lease(reporter.messageTimeoutNanos, TimeUnit.NANOSECONDS);
-  }
-
   private void reScheduleAndFlush(SizeBoundedQueue q) {
-    try {
-      if (q.size() >= reporter.bufferedMaxMessages) {
-        // cancel timer on the queue and reschedule
-        if (reporter.scheduler != null) {
-          reporter.schedulePeriodically(q.key, reporter.messageTimeoutNanos);
-        }
-        // flush until queue size is less then bufferedMaxMessages
-        while (q.size() >= reporter.bufferedMaxMessages) reporter.flush(q);
+    if (q.size() >= reporter.bufferedMaxMessages) {
+      // cancel timer on the queue and reschedule
+      if (reporter.scheduler != null) {
+        reporter.schedulePeriodically(q.key, reporter.messageTimeoutNanos);
       }
-    } finally {
-      recycler.recycle(q);
+      // flush until queue size is less then bufferedMaxMessages
+      while (q.size() >= reporter.bufferedMaxMessages) reporter.flush(q);
     }
   }
 }
