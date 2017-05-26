@@ -100,7 +100,7 @@ abstract class AbstractQueueRecycler implements QueueRecycler {
       lock.lock();
       try {
         // offer only when not dead
-        if (keyToQueue.containsValue(queue) || queue.count > 0) {
+        if (keyToQueue.containsKey(queue.key) || queue.count > 0) {
           recycler().offer(queue);
         }
       } finally {
