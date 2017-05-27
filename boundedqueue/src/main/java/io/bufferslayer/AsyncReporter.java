@@ -255,10 +255,6 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
           .resolve(emptyList())
           .promise();
     }
-    if (drained == bufferedMaxMessages &&
-        pending.size() < bufferedMaxMessages) {
-      synchronizer.release(pending);
-    }
     // Update metrics
     metrics.updateQueuedMessages(pending.key, pending.count);
     final List<Message> messages = buffer.drain();

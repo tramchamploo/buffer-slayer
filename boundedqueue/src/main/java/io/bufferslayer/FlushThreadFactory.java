@@ -49,13 +49,16 @@ class FlushThreadFactory {
   }
 
   private void reScheduleAndFlush(SizeBoundedQueue q) {
-    if (q.size() >= reporter.bufferedMaxMessages) {
-      // cancel timer on the queue and reschedule
-      if (reporter.scheduler != null) {
-        reporter.schedulePeriodically(q.key, reporter.messageTimeoutNanos);
+    try {
+      while (q.size() >= reporter.bufferedMaxMessages) {
+        // cancel timer on the queue and reschedule
+        if (reporter.scheduler != null) {
+          reporter.schedulePeriodically(q.key, reporter.messageTimeoutNanos);
+        }
+        reporter.flush(q);
       }
-      // flush until queue size is less then bufferedMaxMessages
-      while (q.size() >= reporter.bufferedMaxMessages) reporter.flush(q);
+    } finally {
+      synchronizer.release(q);
     }
   }
 }
