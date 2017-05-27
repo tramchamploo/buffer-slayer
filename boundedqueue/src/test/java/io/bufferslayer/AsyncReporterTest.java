@@ -9,6 +9,7 @@ import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.IntStream;
 import org.jdeferred.Promise;
 import org.junit.After;
 import org.junit.Test;
@@ -48,24 +49,29 @@ public class AsyncReporterTest {
   @Test
   public void flushIfExceedMaxSize() throws InterruptedException {
     FakeSender sender = new FakeSender();
-    CountDownLatch countDown = new CountDownLatch(1);
-    sender.onMessages(m -> countDown.countDown());
+
+    CountDownLatch countDown = new CountDownLatch(5 * 10);
+    sender.onMessages(m -> IntStream.range(0, m.size()).forEach(i -> countDown.countDown()));
 
     reporter = AsyncReporter.builder(sender)
-        .pendingMaxMessages(1)
-        .bufferedMaxMessages(1)
-        .messageTimeout(Integer.MAX_VALUE, TimeUnit.SECONDS)
+        .pendingMaxMessages(10)
+        .bufferedMaxMessages(2)
+        .messageTimeout(Integer.MAX_VALUE, TimeUnit.MILLISECONDS)
+        .flushThreads(5)
         .build();
-    TestMessage message = newMessage(0);
-    reporter.report(message);
-    assertTrue(countDown.await(50, TimeUnit.MILLISECONDS));
-    assertEquals(0, sender.sent.get(0).key);
-    // make sure the queue is recycled
-    assertEquals(message.asMessageKey(), reporter.pendingRecycler
-        .lease(10, TimeUnit.MILLISECONDS)
-        .key);
-    // and the ready state is cleared
-    assertFalse(reporter.synchronizer.isReady());
+
+    for (int j = 0; j < 10; j++) {
+      for (int i = 0; i < 5; i++) {
+        reporter.report(newMessage(i));
+      }
+    }
+
+    assertTrue(countDown.await(200, TimeUnit.MILLISECONDS));
+    assertEquals(50, sender.sent.size());
+
+    // make sure the queue is released
+    assertEquals(0, reporter.synchronizer.deque.size());
+    assertEquals(0, reporter.synchronizer.keyToReady.size());
   }
 
   @Test
@@ -80,7 +86,7 @@ public class AsyncReporterTest {
     reporter.report(newMessage(0));
     reporter.report(newMessage(1));
 
-    assertEquals(2, reporter.pendingRecycler.elements().size());
+    assertEquals(2, reporter.queueManager.elements().size());
   }
 
   @Test
@@ -96,7 +102,7 @@ public class AsyncReporterTest {
     reporter.report(newMessage(0));
     reporter.report(newMessage(1));
 
-    assertEquals(1, reporter.pendingRecycler.elements().size());
+    assertEquals(1, reporter.queueManager.elements().size());
   }
 
   @Test
@@ -111,7 +117,7 @@ public class AsyncReporterTest {
     reporter.report(newMessage(0));
     reporter.report(newMessage(0));
 
-    assertEquals(1, reporter.pendingRecycler.elements().size());
+    assertEquals(1, reporter.queueManager.elements().size());
   }
 
   @Test

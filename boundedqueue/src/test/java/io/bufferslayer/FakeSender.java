@@ -1,8 +1,8 @@
 package io.bufferslayer;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -12,7 +12,7 @@ import java.util.function.Consumer;
 public class FakeSender implements Sender<TestMessage, Integer> {
 
   private AtomicBoolean closed = new AtomicBoolean(false);
-  final ArrayList<TestMessage> sent = new ArrayList<>();
+  final List<TestMessage> sent = new CopyOnWriteArrayList<>();
   private Consumer<List<TestMessage>> onMessages = messages -> {};
 
   @Override

@@ -1,5 +1,7 @@
 package io.bufferslayer;
 
+import io.bufferslayer.Message.MessageKey;
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.Condition;
@@ -11,60 +13,75 @@ import java.util.concurrent.locks.ReentrantLock;
  * <p>Flush threads should block when no pending queue has more elements
  * than {@code bufferedMaxMessages}.
  */
-class FlushSynchronizer<K> {
+class FlushSynchronizer {
 
   private final Lock lock = new ReentrantLock();
   private final Condition available = lock.newCondition();
-
+  // Use a HashMap to faster the existence check of queues
+  final Map<MessageKey, Object> keyToReady = new HashMap<>();
   private static final Object READY = new Object();
-  private final Map<K, Object> keyToReady = new HashMap<>();
 
-  boolean isReady() {
-    return remaining() > 0;
-  }
+  ArrayDeque<SizeBoundedQueue> deque = new ArrayDeque<>();
 
-  void notifyOne(K key) {
+  /**
+   * Offer a queue here in order to make flush threads have something to drain
+   * <p> if queue already existed, do nothing
+   * @param q queue to offer
+   */
+  boolean offer(SizeBoundedQueue q) {
     lock.lock();
     try {
-      if (!keyToReady.containsKey(key)) {
-        keyToReady.put(key, READY);
+      if (!keyToReady.containsKey(q.key)) {
+        keyToReady.put(q.key, READY);
+        boolean result = deque.offer(q);
         available.signal();
+        return result;
       }
     } finally {
       lock.unlock();
     }
+    return false;
   }
 
-  void finish(K key) {
-    if (keyToReady.containsKey(key)) {
-      lock.lock();
-      try {
-        if (keyToReady.containsKey(key)) {
-          keyToReady.remove(key);
-        }
-      } finally {
-        lock.unlock();
-      }
-    }
-  }
-
-  int remaining() {
-    lock.lock();
-    try {
-      return keyToReady.size();
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  void await(long timeoutNanos) throws InterruptedException {
+  /**
+   * Wait until at least one queue appears, then return it.
+   * @param timeoutNanos if reaches this timeout and no queue appears, return null
+   * @return the first queue offered
+   */
+  SizeBoundedQueue poll(long timeoutNanos) throws InterruptedException {
     lock.lock();
     try {
       long nanosLeft = timeoutNanos;
-      while (!isReady()) {
-        if (nanosLeft <= 0) break;
+      while (deque.isEmpty()) {
+        if (nanosLeft <= 0) return null;
         nanosLeft = available.awaitNanos(nanosLeft);
       }
+      return deque.poll();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Remove the key from the map so it can be offered again
+   */
+  void release(SizeBoundedQueue q) {
+    lock.lock();
+    try {
+      keyToReady.remove(q.key);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Clear everything
+   */
+  void clear() {
+    lock.lock();
+    try {
+      keyToReady.clear();
+      deque.clear();
     } finally {
       lock.unlock();
     }

@@ -46,6 +46,7 @@ public class AsyncReporterBenchmark {
     reporter = AsyncReporter.builder(sender)
         .pendingMaxMessages(1000000)
         .metrics(metrics)
+        .messageTimeout(1000, TimeUnit.NANOSECONDS)
         .build();
   }
 

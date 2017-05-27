@@ -72,7 +72,6 @@ public class BatchJdbcTemplateBenchmark {
     reporter = AsyncReporter.builder(proxy)
         .pendingKeepalive(1, TimeUnit.SECONDS)
         .senderThreads(10)
-        .strictOrder(true)
         .build();
     batch = new BatchJdbcTemplate(delegate, reporter);
     batch.setDataSource(dataSource);
@@ -86,9 +85,6 @@ public class BatchJdbcTemplateBenchmark {
 
   @TearDown(Level.Iteration)
   public void dropTable() {
-    for (SizeBoundedQueue pending : reporter.pendingRecycler.elements()) {
-      pending.clear();
-    }
     unbatch.update(TRUNCATE_TABLE);
   }
 
