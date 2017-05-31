@@ -307,8 +307,8 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
 
   @Override
   public void close() {
+    if (!closed.compareAndSet(false, true)) return;
     close = new CountDownLatch(messageTimeoutNanos > 0 ? flushThreads : 0);
-    closed.set(true);
     try {
       if (!close.await(messageTimeoutNanos, TimeUnit.NANOSECONDS)) {
         logger.warn("Timed out waiting for close");
