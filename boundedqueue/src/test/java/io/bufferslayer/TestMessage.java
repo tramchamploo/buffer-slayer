@@ -31,6 +31,11 @@ public class TestMessage extends Message {
       Key other = (Key) obj;
       return this.key == other.key;
     }
+
+    @Override
+    public String toString() {
+      return "TestMessage(" + key + ")";
+    }
   }
 
   @Override

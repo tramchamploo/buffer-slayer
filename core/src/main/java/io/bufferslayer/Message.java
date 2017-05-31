@@ -38,6 +38,11 @@ public abstract class Message implements Serializable {
     public boolean equals(Object obj) {
       return this == obj;
     }
+
+    @Override
+    public String toString() {
+      return "STRICT_ORDER";
+    }
   };
 
   /**
@@ -56,5 +61,11 @@ public abstract class Message implements Serializable {
      */
     @Override
     public abstract boolean equals(Object obj);
+
+    /**
+     * This will be logged duration queue creation and destroy.
+     */
+    @Override
+    public abstract String toString();
   }
 }

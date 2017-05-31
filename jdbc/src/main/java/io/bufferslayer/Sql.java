@@ -120,5 +120,10 @@ final class Sql extends Message {
       }
       return sql != null ? sql.hashCode() : 0;
     }
+
+    @Override
+    public String toString() {
+      return "SqlKey(" + sql + ", " + prepared + ")";
+    }
   }
 }
