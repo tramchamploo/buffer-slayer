@@ -10,8 +10,8 @@ final class Buffer implements SizeBoundedQueue.Consumer {
 
   private final int maxSize;
   private final boolean onlyAcceptSame;
-  private final List<Message> buffer = new LinkedList<>();
 
+  final List<Message> buffer = new LinkedList<>();
   boolean bufferFull;
   Message.MessageKey lastMessageKey;
   boolean ofTheSameKey = true;
