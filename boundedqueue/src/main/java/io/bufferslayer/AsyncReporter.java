@@ -39,6 +39,7 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
 
   static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
   static final int DEFAULT_TIMER_THREADS = Runtime.getRuntime().availableProcessors();
+  static final int MAX_BUFFER_POOL_ENTRIES = 1000;
 
   static AtomicLong idGenerator = new AtomicLong();
   final Long id = idGenerator.getAndIncrement();
@@ -56,6 +57,7 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
   final AtomicBoolean closed = new AtomicBoolean(false);
   CountDownLatch close;
   ScheduledExecutorService scheduler;
+  BufferPool bufferPool;
 
   @SuppressWarnings("unchecked")
   private AsyncReporter(Builder builder) {
@@ -68,6 +70,7 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
     this.queueManager = new QueueManager(builder.pendingMaxMessages,
         builder.overflowStrategy, builder.pendingKeepaliveNanos);
     this.flushThreadFactory = new FlushThreadFactory(this);
+    this.bufferPool = new BufferPool(MAX_BUFFER_POOL_ENTRIES, builder.bufferedMaxMessages, builder.strictOrder);
     if (messageTimeoutNanos > 0) {
       ThreadFactory timerFactory = new ThreadFactoryBuilder()
                                       .setNameFormat("AsyncReporter-" + id + "-timer-%d")
@@ -245,22 +248,26 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
 
   @SuppressWarnings("unchecked")
   Promise<List<?>, MessageDroppedException, ?> flush(SizeBoundedQueue pending) {
-    BufferNextMessage buffer = new BufferNextMessage(bufferedMaxMessages, strictOrder);
-    int drained = pending.drainTo(buffer);
-    // Remove overtime queues and relative metrics and timer
-    List<MessageKey> shrinked = queueManager.shrink();
-    clearMetricsAndTimer(shrinked);
-    if (drained == 0) {
-      return new DeferredObject<List<?>, MessageDroppedException, Object>()
-          .resolve(emptyList())
-          .promise();
+    Buffer buffer = bufferPool.acquire();
+    try {
+      int drained = pending.drainTo(buffer);
+      // Remove overtime queues and relative metrics and timer
+      List<MessageKey> shrinked = queueManager.shrink();
+      clearMetricsAndTimer(shrinked);
+      if (drained == 0) {
+        return new DeferredObject<List<?>, MessageDroppedException, Object>()
+            .resolve(emptyList())
+            .promise();
+      }
+      // Update metrics
+      metrics.updateQueuedMessages(pending.key, pending.count);
+      final List<Message> messages = buffer.drain();
+      Promise<List<?>, MessageDroppedException, ?> promise = sender.send(messages);
+      addCallbacks(messages, promise);
+      return promise;
+    } finally {
+      bufferPool.release(buffer);
     }
-    // Update metrics
-    metrics.updateQueuedMessages(pending.key, pending.count);
-    final List<Message> messages = buffer.drain();
-    Promise<List<?>, MessageDroppedException, ?> promise = sender.send(messages);
-    addCallbacks(messages, promise);
-    return promise;
   }
 
   private void clearMetricsAndTimer(Collection<MessageKey> keys) {
