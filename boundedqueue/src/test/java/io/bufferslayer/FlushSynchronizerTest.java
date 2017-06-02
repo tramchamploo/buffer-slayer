@@ -69,6 +69,6 @@ public class FlushSynchronizerTest {
     }).start();
 
     assertFalse(countDown.await(40, TimeUnit.MILLISECONDS));
-    assertTrue(countDown.await(20, TimeUnit.MILLISECONDS));
+    assertTrue(countDown.await(40, TimeUnit.MILLISECONDS));
   }
 }

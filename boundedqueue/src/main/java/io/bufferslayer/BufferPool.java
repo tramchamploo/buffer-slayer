@@ -7,9 +7,9 @@ package io.bufferslayer;
  */
 final class BufferPool {
 
-  private Buffer next;
+  Buffer next;
+  int buffersInPool = 0;
   private int maxPoolEntries;
-  private int buffersInPool = 0;
   private int bufferSize;
   private boolean onlyAcceptSame;
 
