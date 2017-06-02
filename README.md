@@ -56,6 +56,7 @@ This is where you configure all properties.
 
 * `sender`: Sender that messages are flushed into. Necessary but often not needed for users to configure. Implementations like `JdbcTemplate` will configure it by itself.
 * `senderThreads`: Num of threads that sender execute in.
+* `timerThreads`: Num of threads in scheduled executor, flushing messages at a fixed rate.
 * `metrics`: (inmemory, noop) metrics that records nums of sent, dropped, queued messages.
 * `metricsExporter`: (http, log) exporter to let users know data of metrics.
 * `bufferedMaxMessages`: Max size of buffer that sent in one batch.
@@ -65,7 +66,6 @@ This is where you configure all properties.
 * `flushThreads`: Num of threads that flush messages to sender.
 * `overflowStrategy`: (DropHead, DropTail, DropBuffer, DropNew, Fail) after pendingMaxMessages is reached, the strategy will be triggered.
 * `strictOrder`: Whether the messages be sent in order. Notice that if this value is true, different kinds of messages will be staged in the same `SizeBoundedQueue`.
-* `recycler`: (sizefirst, roundrobin) recycler that manages `SizeBoundedQueue`'s lifecycle.
 
 ## Benchmark
 Here is a simple jdbc benchmark result on my MacBook Pro (Retina, 13-inch, Late 2013).
@@ -73,13 +73,13 @@ Here is a simple jdbc benchmark result on my MacBook Pro (Retina, 13-inch, Late 
 Using mysql 5.7.18, keeps executing a simple `INSERT INTO test.benchmark(data, time) VALUES(?, ?);`
 
 ```
-Benchmark                                                      Mode  Cnt       Score  Units
-BatchJdbcTemplateBenchmark.high_contention_batched          thrpt   15    8709.042  ops/s
-BatchJdbcTemplateBenchmark.high_contention_unbatched        thrpt   15     271.529  ops/s
-BatchJdbcTemplateBenchmark.mild_contention_batched          thrpt   15    2146.595  ops/s
-BatchJdbcTemplateBenchmark.mild_contention_unbatched        thrpt   15     262.621  ops/s
-BatchJdbcTemplateBenchmark.no_contention_batched            thrpt   15    1194.852  ops/s
-BatchJdbcTemplateBenchmark.no_contention_unbatched          thrpt   15     201.806  ops/s
+Benchmark                                                    Mode  Cnt       Score  Units
+BatchJdbcTemplateBenchmark.high_contention_batched          thrpt   15   27917.086  ops/s
+BatchJdbcTemplateBenchmark.high_contention_unbatched        thrpt   15     316.562  ops/s
+BatchJdbcTemplateBenchmark.mild_contention_batched          thrpt   15   18672.057  ops/s
+BatchJdbcTemplateBenchmark.mild_contention_unbatched        thrpt   15     280.970  ops/s
+BatchJdbcTemplateBenchmark.no_contention_batched            thrpt   15    9053.288  ops/s
+BatchJdbcTemplateBenchmark.no_contention_unbatched          thrpt   15     198.581  ops/s
 ```
 
 ## Components
