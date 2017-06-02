@@ -6,7 +6,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-final class BufferNextMessage implements SizeBoundedQueue.Consumer {
+final class Buffer implements SizeBoundedQueue.Consumer {
 
   private final int maxSize;
   private final boolean onlyAcceptSame;
@@ -15,8 +15,9 @@ final class BufferNextMessage implements SizeBoundedQueue.Consumer {
   boolean bufferFull;
   Message.MessageKey lastMessageKey;
   boolean ofTheSameKey = true;
+  Buffer next;
 
-  BufferNextMessage(int maxSize, boolean onlyAcceptSame) {
+  Buffer(int maxSize, boolean onlyAcceptSame) {
     this.maxSize = maxSize;
     this.onlyAcceptSame = onlyAcceptSame;
   }
@@ -45,10 +46,14 @@ final class BufferNextMessage implements SizeBoundedQueue.Consumer {
       return Collections.emptyList();
     }
     ArrayList<Message> result = new ArrayList<>(buffer);
+    clear();
+    return result;
+  }
+
+  void clear() {
     buffer.clear();
     bufferFull = false;
     lastMessageKey = null;
     ofTheSameKey = true;
-    return result;
   }
 }
