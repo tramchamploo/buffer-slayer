@@ -2,12 +2,14 @@ package io.bufferslayer;
 
 import fi.iki.elonen.NanoHTTPD;
 import java.io.IOException;
+import java.net.ServerSocket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Created by tramchamploo on 2017/3/16.
- * A simple metrics viewer on port 15090
+ * A simple metrics viewer on port 15090.
+ * If port already in use, pick a unused one randomly.
  */
 public class HttpReporterMetricsExporter extends ReporterMetricsExporter {
 
@@ -18,11 +20,11 @@ public class HttpReporterMetricsExporter extends ReporterMetricsExporter {
 
     private final ReporterMetrics metrics;
 
-    HttpServer(ReporterMetrics metrics) throws IOException {
-      super(PORT);
+    HttpServer(int port, ReporterMetrics metrics) throws IOException {
+      super(port);
       this.metrics = metrics;
       start(NanoHTTPD.SOCKET_READ_TIMEOUT);
-      logger.info("Metrics server started at: " + PORT);
+      logger.info("Metrics server started at: " + port);
     }
 
     @Override
@@ -41,9 +43,25 @@ public class HttpReporterMetricsExporter extends ReporterMetricsExporter {
   @Override
   public void start(ReporterMetrics metrics) {
     try {
-      server = new HttpServer(metrics);
+      server = new HttpServer(PORT, metrics);
     } catch (IOException e) {
-      logger.warn("Exporting server failed to start. ", e);
+      logger.warn("Port {} already in use, pick another one.", PORT);
+      try {
+        server = new HttpServer(pickUnusedPort(), metrics);
+      } catch (IOException e2) {
+        logger.warn("Exporting server failed to start. ", e2);
+      }
+    }
+  }
+
+  private int pickUnusedPort() {
+    try {
+      ServerSocket serverSocket = new ServerSocket(0);
+      int port = serverSocket.getLocalPort();
+      serverSocket.close();
+      return port;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 
