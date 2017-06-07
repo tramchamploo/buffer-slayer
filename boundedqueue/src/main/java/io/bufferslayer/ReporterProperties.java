@@ -20,7 +20,7 @@ public class ReporterProperties {
   private int timerThreads = AsyncReporter.DEFAULT_TIMER_THREADS;
   private int bufferedMaxMessages = 100;
   private int pendingMaxMessages = 10000;
-  private boolean strictOrder = false;
+  private boolean singleKey = false;
   private String overflowStrategy = DropHead.name();
 
   public Sender getSender() {
@@ -116,13 +116,13 @@ public class ReporterProperties {
     return this.metricsExporter;
   }
 
-  public ReporterProperties setStrictOrder(boolean strictOrder) {
-    this.strictOrder = strictOrder;
+  public ReporterProperties setSingleKey(boolean singleKey) {
+    this.singleKey = singleKey;
     return this;
   }
 
-  public boolean isStrictOrder() {
-    return strictOrder;
+  public boolean isSingleKey() {
+    return singleKey;
   }
 
   public String getOverflowStrategy() {
@@ -143,7 +143,7 @@ public class ReporterProperties {
         .timerThreads(timerThreads)
         .bufferedMaxMessages(bufferedMaxMessages)
         .pendingMaxMessages(pendingMaxMessages)
-        .strictOrder(strictOrder)
+        .singleKey(singleKey)
         .overflowStrategy(OverflowStrategy.create(overflowStrategy));
     if (metrics.equalsIgnoreCase("inmemory")) {
       builder.metrics(InMemoryReporterMetrics

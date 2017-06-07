@@ -90,12 +90,12 @@ public class BatchJdbcTemplateTest {
   }
 
   @Test
-  public void strictOrder() {
+  public void singleKey() {
     reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
         .pendingMaxMessages(10)
         .bufferedMaxMessages(2)
         .messageTimeout(0, TimeUnit.MILLISECONDS)
-        .strictOrder(true)
+        .singleKey(true)
         .build();
     batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
 

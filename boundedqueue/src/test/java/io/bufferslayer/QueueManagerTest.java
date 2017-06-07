@@ -27,8 +27,8 @@ public class QueueManagerTest {
   
   @Test
   public void getAfterCreate() {
-    SizeBoundedQueue q = manager.getOrCreate(Message.STRICT_ORDER);
-    assertEquals(q, manager.getOrCreate(Message.STRICT_ORDER));
+    SizeBoundedQueue q = manager.getOrCreate(Message.SINGLE_KEY);
+    assertEquals(q, manager.getOrCreate(Message.SINGLE_KEY));
   }
 
   @Test
@@ -38,33 +38,33 @@ public class QueueManagerTest {
     manager.createCallback(new Callback() {
       @Override
       public void call(SizeBoundedQueue queue) {
-        assertEquals(Message.STRICT_ORDER, queue.key);
+        assertEquals(Message.SINGLE_KEY, queue.key);
         callCount.incrementAndGet();
         countDown.countDown();
       }
     });
-    manager.getOrCreate(Message.STRICT_ORDER);
+    manager.getOrCreate(Message.SINGLE_KEY);
     countDown.await();
-    manager.getOrCreate(Message.STRICT_ORDER);
+    manager.getOrCreate(Message.SINGLE_KEY);
     // only triggered once created
     assertEquals(1, callCount.get());
   }
 
   @Test
   public void keepAlive() throws InterruptedException {
-    SizeBoundedQueue q = manager.getOrCreate(Message.STRICT_ORDER);
+    SizeBoundedQueue q = manager.getOrCreate(Message.SINGLE_KEY);
     TimeUnit.MILLISECONDS.sleep(10);
 
-    assertEquals(Message.STRICT_ORDER, manager.shrink().get(0));
+    assertEquals(Message.SINGLE_KEY, manager.shrink().get(0));
     assertEquals(0, manager.keyToQueue.size());
     assertEquals(0, manager.keyToLastGet.size());
-    SizeBoundedQueue q1 = manager.getOrCreate(Message.STRICT_ORDER);
+    SizeBoundedQueue q1 = manager.getOrCreate(Message.SINGLE_KEY);
     assertNotEquals(q, q1);
 
     TimeUnit.MILLISECONDS.sleep(10);
-    manager.getOrCreate(Message.STRICT_ORDER);
+    manager.getOrCreate(Message.SINGLE_KEY);
     assertEquals(1, manager.keyToQueue.size());
     assertEquals(1, manager.keyToLastGet.size());
-    assertEquals(q1, manager.getOrCreate(Message.STRICT_ORDER));
+    assertEquals(q1, manager.getOrCreate(Message.SINGLE_KEY));
   }
 }

@@ -47,7 +47,7 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
   final ReporterMetrics metrics;
   final long messageTimeoutNanos;
   final int bufferedMaxMessages;
-  final boolean strictOrder;
+  final boolean singleKey;
   final int flushThreads;
   final FlushThreadFactory flushThreadFactory;
   final CopyOnWriteArraySet<Thread> flushers = new CopyOnWriteArraySet<>();
@@ -65,12 +65,12 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
     this.metrics = builder.metrics;
     this.messageTimeoutNanos = builder.messageTimeoutNanos;
     this.bufferedMaxMessages = builder.bufferedMaxMessages;
-    this.strictOrder = builder.strictOrder;
+    this.singleKey = builder.singleKey;
     this.flushThreads = builder.flushThreads;
     this.queueManager = new QueueManager(builder.pendingMaxMessages,
         builder.overflowStrategy, builder.pendingKeepaliveNanos);
     this.flushThreadFactory = new FlushThreadFactory(this);
-    this.bufferPool = new BufferPool(MAX_BUFFER_POOL_ENTRIES, builder.bufferedMaxMessages, builder.strictOrder);
+    this.bufferPool = new BufferPool(MAX_BUFFER_POOL_ENTRIES, builder.bufferedMaxMessages, builder.singleKey);
     if (messageTimeoutNanos > 0) {
       ThreadFactory timerFactory = new ThreadFactoryBuilder()
                                       .setNameFormat("AsyncReporter-" + id + "-timer-%d")
@@ -104,7 +104,7 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
     int flushThreads = 1;
     int timerThreads = DEFAULT_TIMER_THREADS;
     long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
-    boolean strictOrder = false;
+    boolean singleKey = false;
     Strategy overflowStrategy = DropHead;
 
     Builder(Sender sender) {
@@ -159,8 +159,8 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
       return this;
     }
 
-    public Builder strictOrder(boolean strictOrder) {
-      this.strictOrder = strictOrder;
+    public Builder singleKey(boolean singleKey) {
+      this.singleKey = singleKey;
       return this;
     }
 
@@ -201,9 +201,9 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
         started.compareAndSet(false, true)) {
       startFlushThreads();
     }
-    // If strictOrder is true, ignore original message key.
+    // If singleKey is true, ignore original message key.
     Message.MessageKey key = message.asMessageKey();
-    key = strictOrder ? Message.STRICT_ORDER : key;
+    key = singleKey ? Message.SINGLE_KEY : key;
 
     // Offer message to pending queue.
     SizeBoundedQueue pending = queueManager.getOrCreate(key);
