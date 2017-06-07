@@ -56,56 +56,7 @@ final class SizeBoundedQueue {
 
   // Used for testing
   SizeBoundedQueue(int maxSize, Strategy overflowStrategy) {
-    this(maxSize, overflowStrategy, Message.STRICT_ORDER);
-  }
-
-  /**
-   * Drop the last element
-   */
-  Message dropTail() {
-    if (--writePos == -1) {
-      writePos = elements.length - 1; // circle forward to the end of the array
-    }
-    Message tail = elements[writePos];
-    elements[writePos] = null;
-    count--;
-    notFull.signal();
-    return tail;
-  }
-
-  /**
-   * Drop the first element
-   */
-  Message dropHead() {
-    Message head = elements[readPos];
-    elements[readPos] = null;
-    if (++readPos == elements.length) {
-      readPos = 0; // circle back to the front of the array
-    }
-    count--;
-    notFull.signal();
-    return head;
-  }
-
-  void enqueue(Message next) {
-    try {
-      while (isFull()) {
-        notFull.await();
-      }
-      elements[writePos++] = next;
-
-      if (writePos == elements.length) {
-        writePos = 0; // circle back to the front of the array
-      }
-
-      count++;
-      notEmpty.signal(); // alert any drainers
-    } catch (InterruptedException e) {
-    }
-  }
-
-  boolean isFull() {
-    return count == elements.length;
+    this(maxSize, overflowStrategy, Message.SINGLE_KEY);
   }
 
   /**
@@ -133,7 +84,7 @@ final class SizeBoundedQueue {
             DeferredHolder.reject(dropped(DropHead, head));
             return;
           case DropBuffer:
-            List<Message> allElements = allElements();
+            List<Message> allElements = removeAll();
             doClear();
             enqueue(next);
             deferred.notify(1);
@@ -152,38 +103,56 @@ final class SizeBoundedQueue {
     }
   }
 
-  int drainTo(Consumer consumer) {
-    lock.lock();
-    try {
-      return doDrain(consumer);
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  int doClear() {
-    int result = count;
-    count = readPos = writePos = 0;
-    Arrays.fill(elements, null);
-    for (int i = result; i > 0 && lock.hasWaiters(notFull); i--) {
-      notFull.signal();
-    }
-    return result;
+  private boolean isFull() {
+    return count == elements.length;
   }
 
   /**
-   * Clears the queue unconditionally and returns count dropped elements cleared.
+   * Drop the last element
    */
-  int clear() {
-    lock.lock();
+  private Message dropTail() {
+    if (--writePos == -1) {
+      writePos = elements.length - 1; // circle forward to the end of the array
+    }
+    Message tail = elements[writePos];
+    elements[writePos] = null;
+    count--;
+    notFull.signal();
+    return tail;
+  }
+
+  /**
+   * Drop the first element
+   */
+  private Message dropHead() {
+    Message head = elements[readPos];
+    elements[readPos] = null;
+    if (++readPos == elements.length) {
+      readPos = 0; // circle back to the front of the array
+    }
+    count--;
+    notFull.signal();
+    return head;
+  }
+
+  private void enqueue(Message next) {
     try {
-      return doClear();
-    } finally {
-      lock.unlock();
+      while (isFull()) {
+        notFull.await();
+      }
+      elements[writePos++] = next;
+
+      if (writePos == elements.length) {
+        writePos = 0; // circle back to the front of the array
+      }
+
+      count++;
+      notEmpty.signal(); // alert any drainers
+    } catch (InterruptedException e) {
     }
   }
 
-  List<Message> allElements() {
+  private List<Message> removeAll() {
     final List<Message> result = new LinkedList<>();
     doDrain(new Consumer() {
       @Override
@@ -194,7 +163,16 @@ final class SizeBoundedQueue {
     return result;
   }
 
-  int doDrain(Consumer consumer) {
+  int drainTo(Consumer consumer) {
+    lock.lock();
+    try {
+      return doDrain(consumer);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private int doDrain(Consumer consumer) {
     int drainedCount = 0;
     while (drainedCount < count) {
       Message next = elements[readPos];
@@ -218,6 +196,28 @@ final class SizeBoundedQueue {
       notFull.signal();
     }
     return drainedCount;
+  }
+
+  /**
+   * Clears the queue unconditionally and returns count dropped elements cleared.
+   */
+  int clear() {
+    lock.lock();
+    try {
+      return doClear();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private int doClear() {
+    int result = count;
+    count = readPos = writePos = 0;
+    Arrays.fill(elements, null);
+    for (int i = result; i > 0 && lock.hasWaiters(notFull); i--) {
+      notFull.signal();
+    }
+    return result;
   }
 
   int size() {

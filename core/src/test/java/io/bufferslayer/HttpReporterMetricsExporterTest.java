@@ -31,7 +31,7 @@ public class HttpReporterMetricsExporterTest {
 
     metrics.incrementMessages(1);
     metrics.incrementMessagesDropped(2);
-    metrics.updateQueuedMessages(Message.STRICT_ORDER, 3);
+    metrics.updateQueuedMessages(Message.SINGLE_KEY, 3);
     response = client.newCall(request).execute();
     assertEquals("{\"messages\":1,\"messagesDropped\":2,\"queuedMessages\":3}",
         response.body().string());

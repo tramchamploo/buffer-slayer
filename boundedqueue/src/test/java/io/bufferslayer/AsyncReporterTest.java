@@ -90,14 +90,14 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void strictOrdered_differentMessagesShareSamePendingQueue() throws InterruptedException {
+  public void singleKey_differentMessagesShareSamePendingQueue() throws InterruptedException {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
         .metrics(metrics)
         .messageTimeout(0, TimeUnit.MILLISECONDS)
         .pendingKeepalive(1, TimeUnit.SECONDS)
-        .strictOrder(true)
+        .singleKey(true)
         .build();
     reporter.report(newMessage(0));
     reporter.report(newMessage(1));

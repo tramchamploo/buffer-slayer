@@ -60,7 +60,7 @@ abstract class TimeDriven<K> {
   void cancelTimer(K timerKey) {
     Timer timer = keyToTimer.get(timerKey);
     if (timer != null) {
-      timer.task.cancel(true);
+      timer.task.cancel(false);
       keyToTimer.remove(timerKey);
     }
   }
@@ -71,7 +71,7 @@ abstract class TimeDriven<K> {
 
   void clearTimers() {
     for (Timer timer: keyToTimer.values()) {
-      timer.task.cancel(true);
+      timer.task.cancel(false);
     }
     keyToTimer.clear();
   }

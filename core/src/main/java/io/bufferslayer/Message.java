@@ -26,9 +26,9 @@ public abstract class Message implements Serializable {
   public abstract String toString();
 
   /**
-   * If strict order is true, we will only have one pending queue, whose key is this.
+   * If singleKey is true, we will only have one pending queue with key of this instance.
    */
-  public static final MessageKey STRICT_ORDER = new MessageKey() {
+  public static final MessageKey SINGLE_KEY = new MessageKey() {
     @Override
     public int hashCode() {
       return 0;
@@ -41,7 +41,7 @@ public abstract class Message implements Serializable {
 
     @Override
     public String toString() {
-      return "STRICT_ORDER";
+      return "SINGLE_KEY";
     }
   };
 

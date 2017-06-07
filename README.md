@@ -65,7 +65,7 @@ This is where you configure all properties.
 * `pendingMaxMessages`: Max size of messages to be stashed until OverflowStrategy is triggered.
 * `pendingKeepaliveNanos`: Pending queue should die if no messages queued into during in its keepalive.
 * `overflowStrategy`: (DropHead, DropTail, DropBuffer, DropNew, Fail) after pendingMaxMessages is reached, the strategy will be triggered.
-* `strictOrder`: Whether the messages be sent in order. Notice that if this value is true, different kinds of messages will be staged in the same `SizeBoundedQueue`.
+* `singleKey`: If this value is true, different kinds of messages will be staged in the same `SizeBoundedQueue`.
 
 ## Benchmark
 Here is a simple jdbc benchmark result on my MacBook Pro (Retina, 13-inch, Late 2013).

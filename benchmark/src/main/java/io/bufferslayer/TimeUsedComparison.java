@@ -59,7 +59,7 @@ public class TimeUsedComparison {
         .messageTimeout(50, TimeUnit.MILLISECONDS)
         .pendingKeepalive(10, TimeUnit.MILLISECONDS)
         .senderThreads(10)
-        .strictOrder(true)
+        .singleKey(true)
         .build();
     batch = new BatchJdbcTemplate(delegate, reporter);
     batch.setDataSource(dataSource);
