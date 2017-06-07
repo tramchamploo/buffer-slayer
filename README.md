@@ -17,7 +17,7 @@ This project is inspired by [zipkin-reporter-java](https://github.com/openzipkin
 * A promise is returned for async sending. Even though messages are sent in batch, you can get a one-to-one promise from the message sent to sending result.
 
 ## JdbcTemplate
-[`sql-buffer-jdbc`](/jdbc) is a buffer implementation of Spring's JdbcTemplate.
+[`bufferslayer-spring-jdbc`](/jdbc) is a buffer implementation of Spring's JdbcTemplate.
 
 Queries are forwarded to the delegated JdbcTemplate and executed blockingly.
 
@@ -27,7 +27,7 @@ Updates directly goes to the reporter and returns a `Promise` immediately.
 ```xml
 <dependency>
   <groupId>io.bufferslayer</groupId>
-  <artifactId>buffer-spring-jdbc</artifactId>
+  <artifactId>bufferslayer-spring-jdbc</artifactId>
   <version>1.2.2</version>
 </dependency>
 ```
