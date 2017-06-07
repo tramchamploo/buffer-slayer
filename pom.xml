@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>io.bufferslayer</groupId>
-  <artifactId>parent</artifactId>
+  <artifactId>bufferslayer-parent</artifactId>
   <version>1.2.3-SNAPSHOT</version>
   <packaging>pom</packaging>
 
@@ -74,32 +74,32 @@
     <dependencies>
       <dependency>
         <groupId>${project.groupId}</groupId>
-        <artifactId>core</artifactId>
+        <artifactId>bufferslayer-core</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
         <groupId>${project.groupId}</groupId>
-        <artifactId>boundedqueue</artifactId>
+        <artifactId>bufferslayer-boundedqueue</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
         <groupId>${project.groupId}</groupId>
-        <artifactId>boundedqueue</artifactId>
+        <artifactId>bufferslayer-boundedqueue</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
 
       <dependency>
         <groupId>${project.groupId}</groupId>
-        <artifactId>buffer-spring-jdbc</artifactId>
+        <artifactId>bufferslayer-spring-jdbc</artifactId>
         <version>${project.version}</version>
       </dependency>
 
       <dependency>
         <groupId>${project.groupId}</groupId>
-        <artifactId>buffer-spring-jdbc</artifactId>
+        <artifactId>bufferslayer-spring-jdbc</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
