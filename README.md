@@ -28,7 +28,7 @@ Updates directly goes to the reporter and returns a `Promise` immediately.
 <dependency>
   <groupId>io.bufferslayer</groupId>
   <artifactId>bufferslayer-spring-jdbc</artifactId>
-  <version>1.2.2</version>
+  <version>1.2.3</version>
 </dependency>
 ```
 
