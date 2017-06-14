@@ -15,16 +15,16 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 final class JdbcTemplateSender implements Sender<Sql, Integer> {
 
-  private final JdbcTemplate delegate;
+  private final JdbcTemplate underlying;
 
-  JdbcTemplateSender(JdbcTemplate delegate) {
-    this.delegate = delegate;
+  JdbcTemplateSender(JdbcTemplate underlying) {
+    this.underlying = underlying;
   }
 
   @Override
   public CheckResult check() {
     try {
-      int one = delegate.queryForObject("SELECT 1;", Integer.class);
+      int one = underlying.queryForObject("SELECT 1;", Integer.class);
       return one == 1 ? CheckResult.OK
           : CheckResult.failed(new RuntimeException("SELECT 1 doesn't get 1."));
     } catch (Exception e) {
@@ -46,9 +46,9 @@ final class JdbcTemplateSender implements Sender<Sql, Integer> {
     boolean prepared = allPreparedStatement(sqls);
     int[] rowsAffected;
     if (prepared) {
-      rowsAffected = delegate.batchUpdate(sqls.get(0).sql, batchPreparedStatementSetter(sqls));
+      rowsAffected = underlying.batchUpdate(sqls.get(0).sql, batchPreparedStatementSetter(sqls));
     } else {
-      rowsAffected = delegate.batchUpdate(extractSqls(sqls).toArray(new String[0]));
+      rowsAffected = underlying.batchUpdate(extractSqls(sqls).toArray(new String[0]));
     }
 
     List<Integer> ret = new ArrayList<>(rowsAffected.length);

@@ -19,7 +19,7 @@ import org.junit.Test;
  */
 public class AsyncReporterTest {
 
-  private AsyncReporter reporter;
+  private AsyncReporter<TestMessage, Integer> reporter;
   private InMemoryReporterMetrics metrics =
       InMemoryReporterMetrics.instance(ReporterMetricsExporter.NOOP_EXPORTER);
 
@@ -248,7 +248,7 @@ public class AsyncReporterTest {
         .build();
 
     CountDownLatch countDown = new CountDownLatch(1);
-    Promise<Object, MessageDroppedException, Integer> promise = reporter.report(newMessage(0));
+    Promise<Integer, MessageDroppedException, Integer> promise = reporter.report(newMessage(0));
     promise.done(d -> {
       assertEquals(1, metrics.queuedMessages.size());
       countDown.countDown();
