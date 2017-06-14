@@ -34,10 +34,10 @@ import org.springframework.jdbc.support.rowset.SqlRowSet;
 public class BatchJdbcTemplate {
 
   private final JdbcTemplate delegate;
-  private final Reporter reporter;
+  private final Reporter<Sql, Integer> reporter;
 
   @VisibleForTesting
-  BatchJdbcTemplate(JdbcTemplate delegate, Reporter reporter) {
+  BatchJdbcTemplate(JdbcTemplate delegate, Reporter<Sql, Integer> reporter) {
     this.delegate = delegate;
     this.reporter = reporter;
   }
@@ -185,7 +185,7 @@ public class BatchJdbcTemplate {
     return delegate.queryForRowSet(sql);
   }
 
-  public Promise update(String sql) throws DataAccessException {
+  public Promise<Integer, MessageDroppedException, ?> update(String sql) throws DataAccessException {
     return reporter.report(Sql.builder().sql(sql).build());
   }
 
@@ -353,7 +353,7 @@ public class BatchJdbcTemplate {
     return delegate.queryForRowSet(sql, args);
   }
 
-  public Promise update(PreparedStatementCreator psc) throws DataAccessException {
+  public Promise<Integer, MessageDroppedException, ?> update(PreparedStatementCreator psc) throws DataAccessException {
     if (psc instanceof SqlProvider) {
       SqlProvider sqlProvider = (SqlProvider) psc;
       String sql = sqlProvider.getSql();
@@ -373,14 +373,14 @@ public class BatchJdbcTemplate {
     return delegate.update(psc, generatedKeyHolder);
   }
 
-  public Promise update(String sql, PreparedStatementSetter pss) throws DataAccessException {
+  public Promise<Integer, MessageDroppedException, ?> update(String sql, PreparedStatementSetter pss) throws DataAccessException {
     return reporter.report(Sql.builder()
         .sql(sql)
         .preparedStatementSetter(pss)
         .build());
   }
 
-  public Promise update(String sql, Object[] args, int[] argTypes) throws DataAccessException {
+  public Promise<Integer, MessageDroppedException, ?> update(String sql, Object[] args, int[] argTypes) throws DataAccessException {
     return reporter.report(Sql.builder()
         .sql(sql)
         .args(args)
@@ -388,7 +388,7 @@ public class BatchJdbcTemplate {
         .build());
   }
 
-  public Promise update(String sql, Object... args) throws DataAccessException {
+  public Promise<Integer, MessageDroppedException, ?> update(String sql, Object... args) throws DataAccessException {
     return reporter.report(Sql.builder()
         .sql(sql)
         .args(args)

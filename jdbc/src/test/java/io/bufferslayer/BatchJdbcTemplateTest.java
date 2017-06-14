@@ -1,6 +1,7 @@
 package io.bufferslayer;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.sql.Types;
@@ -34,8 +35,8 @@ public class BatchJdbcTemplateTest {
 
   private static DriverManagerDataSource dataSource;
   private BatchJdbcTemplate batchJdbcTemplate;
-  private JdbcTemplate delegate;
-  private AsyncReporter reporter;
+  private JdbcTemplate underlying;
+  private AsyncReporter<Sql, Integer> reporter;
 
   private static final String CREATE_TABLE = "CREATE TABLE IF NOT EXISTS test(id INT PRIMARY KEY AUTO_INCREMENT, data VARCHAR(32), time TIMESTAMP);";
   private static final String TRUNCATE_TABLE = "TRUNCATE TABLE test;";
@@ -56,10 +57,10 @@ public class BatchJdbcTemplateTest {
 
   @Before
   public void setup() throws InterruptedException {
-    delegate = new JdbcTemplate(dataSource);
-    delegate.setDataSource(dataSource);
-    delegate.update(CREATE_TABLE);
-    delegate.update(TRUNCATE_TABLE);
+    underlying = new JdbcTemplate(dataSource);
+    underlying.setDataSource(dataSource);
+    underlying.update(CREATE_TABLE);
+    underlying.update(TRUNCATE_TABLE);
   }
 
   @After
@@ -70,15 +71,15 @@ public class BatchJdbcTemplateTest {
 
   @Test
   public void bufferedUpdate() {
-    reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
+    reporter = AsyncReporter.builder(new JdbcTemplateSender(underlying))
         .pendingMaxMessages(100)
         .bufferedMaxMessages(10)
         .messageTimeout(0, TimeUnit.MILLISECONDS)
         .build();
-    batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
+    batchJdbcTemplate = new BatchJdbcTemplate(underlying, reporter);
 
     for (int i = 0; i < 100; i++) {
-      batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()});
+      batchJdbcTemplate.update(INSERTION, randomString(), new Date());
     }
 
     for (int i = 0; i < 100 / 10; i++) {
@@ -91,23 +92,23 @@ public class BatchJdbcTemplateTest {
 
   @Test
   public void singleKey() {
-    reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
+    reporter = AsyncReporter.builder(new JdbcTemplateSender(underlying))
         .pendingMaxMessages(10)
         .bufferedMaxMessages(2)
         .messageTimeout(0, TimeUnit.MILLISECONDS)
         .singleKey(true)
         .build();
-    batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
+    batchJdbcTemplate = new BatchJdbcTemplate(underlying, reporter);
 
     for (int i = 0; i < 8; i++) {
-      batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()});
+      batchJdbcTemplate.update(INSERTION, randomString(), new Date());
     }
 
     String dataOfFirstNineRows = randomString();
-    batchJdbcTemplate.update(MODIFICATION, new Object[]{dataOfFirstNineRows});
+    batchJdbcTemplate.update(MODIFICATION, dataOfFirstNineRows);
 
     String lastRowData = randomString();
-    batchJdbcTemplate.update(INSERTION, new Object[]{lastRowData, new Date()});
+    batchJdbcTemplate.update(INSERTION, lastRowData, new Date());
 
     // 4 batches for 2 insertions and one for modification and one for single insertion
     for (int i = 0; i < 8 / 2 + 1 + 1; i++) {
@@ -130,16 +131,16 @@ public class BatchJdbcTemplateTest {
 
   @Test
   public void rejectedPromise() throws InterruptedException {
-    FakeSender sender = new FakeSender();
+    SenderProxy sender = new SenderProxy(new JdbcTemplateSender(underlying));
     RuntimeException ex = new RuntimeException();
     sender.onMessages(messages -> { throw ex; });
     reporter = AsyncReporter.builder(sender).messageTimeout(10, TimeUnit.MILLISECONDS).build();
-    batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
+    batchJdbcTemplate = new BatchJdbcTemplate(underlying, reporter);
 
     CountDownLatch countDown = new CountDownLatch(1);
     batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()}).fail(d -> {
-      assertTrue(d instanceof MessageDroppedException);
-      assertEquals(ex, ((MessageDroppedException) d).getCause());
+      assertNotNull(d);
+      assertEquals(ex, d.getCause());
       countDown.countDown();
     });
     countDown.await();
@@ -147,17 +148,17 @@ public class BatchJdbcTemplateTest {
 
   @Test
   public void chainedDeferred() throws InterruptedException {
-    reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
+    reporter = AsyncReporter.builder(new JdbcTemplateSender(underlying))
         .messageTimeout(10, TimeUnit.MILLISECONDS)
         .build();
-    batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
+    batchJdbcTemplate = new BatchJdbcTemplate(underlying, reporter);
 
     CountDownLatch countDown = new CountDownLatch(1);
     batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()}).done(d -> {
-      assertEquals(1, d);
+      assertEquals(new Integer(1), d);
       String expected = randomString();
       batchJdbcTemplate.update(MODIFICATION, new Object[]{expected}).done(dd -> {
-        assertEquals(1, dd);
+        assertEquals(new Integer(1), dd);
         int rowCount = batchJdbcTemplate.queryForObject(ROW_COUNT, Integer.class);
         assertEquals(1, rowCount);
         Object data = batchJdbcTemplate
@@ -171,13 +172,13 @@ public class BatchJdbcTemplateTest {
 
   @Test
   public void unpreparedStatementUseSameFlushThread() throws InterruptedException {
-    reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
+    reporter = AsyncReporter.builder(new JdbcTemplateSender(underlying))
         .pendingMaxMessages(2)
         .bufferedMaxMessages(2)
         .messageTimeout(50, TimeUnit.MILLISECONDS)
         .pendingKeepalive(10, TimeUnit.SECONDS)
         .build();
-    batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
+    batchJdbcTemplate = new BatchJdbcTemplate(underlying, reporter);
 
     for (int i = 0; i < 2; i++) {
       batchJdbcTemplate.update("INSERT INTO test(data, time) VALUES ('data', now())");
@@ -191,43 +192,43 @@ public class BatchJdbcTemplateTest {
 
   @Test
   public void samePreparedStatementUseSameQueue() {
-    reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
+    reporter = AsyncReporter.builder(new JdbcTemplateSender(underlying))
         .pendingMaxMessages(2)
         .bufferedMaxMessages(2)
         .pendingKeepalive(1, TimeUnit.SECONDS)
         .messageTimeout(10, TimeUnit.MILLISECONDS)
         .build();
-    batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
+    batchJdbcTemplate = new BatchJdbcTemplate(underlying, reporter);
 
     for (int i = 0; i < 2; i++) {
-      batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()});
+      batchJdbcTemplate.update(INSERTION, randomString(), new Date());
     }
     assertEquals(1, reporter.queueManager.elements().size());
   }
 
   @Test
   public void differentPreparedStatementUseDifferentQueue() {
-    reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
+    reporter = AsyncReporter.builder(new JdbcTemplateSender(underlying))
         .pendingMaxMessages(2)
         .bufferedMaxMessages(2)
         .pendingKeepalive(1, TimeUnit.SECONDS)
         .messageTimeout(10, TimeUnit.MILLISECONDS)
         .build();
-    batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
+    batchJdbcTemplate = new BatchJdbcTemplate(underlying, reporter);
 
-    batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()});
-    batchJdbcTemplate.update(MODIFICATION, new Object[]{randomString()});
+    batchJdbcTemplate.update(INSERTION, randomString(), new Date());
+    batchJdbcTemplate.update(MODIFICATION, randomString());
     assertEquals(2, reporter.queueManager.elements().size());
   }
 
   @Test
   public void updateWithPreparedStatementCreator() {
-    reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate))
+    reporter = AsyncReporter.builder(new JdbcTemplateSender(underlying))
         .pendingMaxMessages(2)
         .bufferedMaxMessages(2)
         .messageTimeout(0, TimeUnit.MILLISECONDS)
         .build();
-    batchJdbcTemplate = new BatchJdbcTemplate(delegate, reporter);
+    batchJdbcTemplate = new BatchJdbcTemplate(underlying, reporter);
 
     PreparedStatementCreatorFactory creatorFactory = new PreparedStatementCreatorFactory(INSERTION);
     creatorFactory.addParameter(new SqlParameter(Types.VARCHAR));

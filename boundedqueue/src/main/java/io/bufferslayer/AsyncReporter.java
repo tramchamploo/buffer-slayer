@@ -35,7 +35,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Created by tramchamploo on 2017/2/28.
  */
-public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, Flushable, Component {
+public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey>
+    implements Reporter<M, R>, Flushable, Component {
 
   static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
   static final int DEFAULT_TIMER_THREADS = Runtime.getRuntime().availableProcessors();
@@ -43,7 +44,7 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
 
   static AtomicLong idGenerator = new AtomicLong();
   final Long id = idGenerator.getAndIncrement();
-  final AsyncSender sender;
+  final AsyncSender<M, R> sender;
   final ReporterMetrics metrics;
   final long messageTimeoutNanos;
   final int bufferedMaxMessages;
@@ -59,9 +60,8 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
   ScheduledExecutorService scheduler;
   BufferPool bufferPool;
 
-  @SuppressWarnings("unchecked")
-  private AsyncReporter(Builder builder) {
-    this.sender = new SenderToAsyncSenderAdaptor(builder.sender, id, builder.senderThreads);
+  private AsyncReporter(Builder<M, R> builder) {
+    this.sender = new SenderToAsyncSenderAdaptor<>(builder.sender, id, builder.senderThreads);
     this.metrics = builder.metrics;
     this.messageTimeoutNanos = builder.messageTimeoutNanos;
     this.bufferedMaxMessages = builder.bufferedMaxMessages;
@@ -89,13 +89,13 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
     }
   }
 
-  public static Builder builder(Sender sender) {
-    return new Builder(sender);
+  public static <M extends Message, R> Builder<M, R> builder(Sender<M, R> sender) {
+    return new Builder<>(sender);
   }
 
-  public static final class Builder {
+  public static final class Builder<M extends Message, R> {
 
-    final Sender sender;
+    final Sender<M, R> sender;
     int senderThreads = 1;
     ReporterMetrics metrics = ReporterMetrics.NOOP_METRICS;
     long messageTimeoutNanos = TimeUnit.SECONDS.toNanos(1);
@@ -107,70 +107,70 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
     boolean singleKey = false;
     Strategy overflowStrategy = DropHead;
 
-    Builder(Sender sender) {
+    Builder(Sender<M, R> sender) {
       checkNotNull(sender, "sender");
       this.sender = sender;
     }
 
-    public Builder senderThreads(int senderThreads) {
+    public Builder<M, R> senderThreads(int senderThreads) {
       checkArgument(senderThreads > 0, "senderThreads > 0: %s", senderThreads);
       this.senderThreads = senderThreads;
       return this;
     }
 
-    public Builder metrics(ReporterMetrics metrics) {
+    public Builder<M, R> metrics(ReporterMetrics metrics) {
       this.metrics = checkNotNull(metrics, "metrics");
       return this;
     }
 
-    public Builder messageTimeout(long timeout, TimeUnit unit) {
+    public Builder<M, R> messageTimeout(long timeout, TimeUnit unit) {
       checkArgument(timeout >= 0, "timeout >= 0: %s", timeout);
       this.messageTimeoutNanos = unit.toNanos(timeout);
       return this;
     }
 
-    public Builder bufferedMaxMessages(int bufferedMaxMessages) {
+    public Builder<M, R> bufferedMaxMessages(int bufferedMaxMessages) {
       checkArgument(bufferedMaxMessages > 0, "bufferedMaxMessages > 0: %s", bufferedMaxMessages);
       this.bufferedMaxMessages = bufferedMaxMessages;
       return this;
     }
 
-    public Builder pendingMaxMessages(int pendingMaxMessages) {
+    public Builder<M, R> pendingMaxMessages(int pendingMaxMessages) {
       checkArgument(pendingMaxMessages > 0, "pendingMaxMessages > 0: %s", pendingMaxMessages);
       this.pendingMaxMessages = pendingMaxMessages;
       return this;
     }
 
-    public Builder flushThreads(int flushThreads) {
+    public Builder<M, R> flushThreads(int flushThreads) {
       checkArgument(flushThreads > 0, "flushThreads > 0: %s", flushThreads);
       this.flushThreads = flushThreads;
       return this;
     }
 
-    public Builder timerThreads(int timerThreads) {
+    public Builder<M, R> timerThreads(int timerThreads) {
       checkArgument(timerThreads > 0, "timerThreads > 0: %s", timerThreads);
       this.timerThreads = timerThreads;
       return this;
     }
 
-    public Builder pendingKeepalive(long keepalive, TimeUnit unit) {
+    public Builder<M, R> pendingKeepalive(long keepalive, TimeUnit unit) {
       checkArgument(keepalive > 0, "keepalive > 0: %s", keepalive);
       this.pendingKeepaliveNanos = unit.toNanos(keepalive);
       return this;
     }
 
-    public Builder singleKey(boolean singleKey) {
+    public Builder<M, R> singleKey(boolean singleKey) {
       this.singleKey = singleKey;
       return this;
     }
 
-    public Builder overflowStrategy(Strategy overflowStrategy) {
+    public Builder<M, R> overflowStrategy(Strategy overflowStrategy) {
       this.overflowStrategy = overflowStrategy;
       return this;
     }
 
-    public AsyncReporter build() {
-      return new AsyncReporter(this);
+    public AsyncReporter<M, R> build() {
+      return new AsyncReporter<>(this);
     }
   }
 
@@ -186,12 +186,12 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
   }
 
   @Override
-  public Promise<Object, MessageDroppedException, Integer> report(Message message) {
+  public Promise<R, MessageDroppedException, Integer> report(M message) {
     checkNotNull(message, "message");
     metrics.incrementMessages(1);
 
     if (closed.get()) { // Drop the message when closed.
-      DeferredObject<Object, MessageDroppedException, Integer> deferred = new DeferredObject<>();
+      DeferredObject<R, MessageDroppedException, Integer> deferred = new DeferredObject<>();
       deferred.reject(dropped(new IllegalStateException("closed!"), singletonList(message)));
       return deferred.promise();
     }
@@ -207,7 +207,7 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
 
     // Offer message to pending queue.
     SizeBoundedQueue pending = queueManager.getOrCreate(key);
-    Deferred<Object, MessageDroppedException, Integer> deferred = newDeferred(message.id);
+    Deferred<R, MessageDroppedException, Integer> deferred = newDeferred(message.id);
     pending.offer(message, deferred);
     if (pending.size() >= bufferedMaxMessages)
       synchronizer.offer(pending);
@@ -238,7 +238,7 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
   public void flush() {
     try {
       for (SizeBoundedQueue pending : queueManager.elements()) {
-        Promise<List<?>, MessageDroppedException, ?> promise = flush(pending);
+        Promise<List<R>, MessageDroppedException, ?> promise = flush(pending);
         promise.waitSafely();
       }
     } catch (InterruptedException e) {
@@ -247,7 +247,7 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
   }
 
   @SuppressWarnings("unchecked")
-  Promise<List<?>, MessageDroppedException, ?> flush(SizeBoundedQueue pending) {
+  Promise<List<R>, MessageDroppedException, ?> flush(SizeBoundedQueue pending) {
     Buffer buffer = bufferPool.acquire();
     try {
       int drained = pending.drainTo(buffer);
@@ -255,14 +255,15 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
       List<MessageKey> shrinked = queueManager.shrink();
       clearMetricsAndTimer(shrinked);
       if (drained == 0) {
-        return new DeferredObject<List<?>, MessageDroppedException, Object>()
-            .resolve(emptyList())
+        List<R> empty = emptyList();
+        return new DeferredObject<List<R>, MessageDroppedException, Object>()
+            .resolve(empty)
             .promise();
       }
       // Update metrics
       metrics.updateQueuedMessages(pending.key, pending.count);
-      final List<Message> messages = buffer.drain();
-      Promise<List<?>, MessageDroppedException, ?> promise = sender.send(messages);
+      final List<M> messages = (List<M>) buffer.drain();
+      Promise<List<R>, MessageDroppedException, ?> promise = sender.send(messages);
       addCallbacks(messages, promise);
       return promise;
     } finally {
@@ -280,11 +281,11 @@ public class AsyncReporter extends TimeDriven<MessageKey> implements Reporter, F
   /**
    * Resolve the promises returned to the caller by sending result.
    */
-  private void addCallbacks(final List<Message> messages,
-                            Promise<List<?>, MessageDroppedException, ?> promise) {
-    promise.done(new DoneCallback<List<?>>() {
+  private void addCallbacks(final List<M> messages,
+      Promise<List<R>, MessageDroppedException, ?> promise) {
+    promise.done(new DoneCallback<List<R>>() {
       @Override
-      public void onDone(List<?> result) {
+      public void onDone(List<R> result) {
         DeferredHolder.batchResolve(messages, result);
       }
     }).fail(new FailCallback<MessageDroppedException>() {

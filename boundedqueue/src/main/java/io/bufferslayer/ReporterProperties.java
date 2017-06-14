@@ -8,9 +8,9 @@ import java.util.concurrent.TimeUnit;
 /**
  * Created by tramchamploo on 2017/3/16.
  */
-public class ReporterProperties {
+public class ReporterProperties<M extends Message, R> {
 
-  private Sender sender;
+  private Sender<M, R> sender;
   private int senderThreads = 1;
   private String metrics = "noop";
   private String metricsExporter = "noop";
@@ -23,11 +23,11 @@ public class ReporterProperties {
   private boolean singleKey = false;
   private String overflowStrategy = DropHead.name();
 
-  public Sender getSender() {
+  public Sender<M, R> getSender() {
     return sender;
   }
 
-  public ReporterProperties setSender(Sender sender) {
+  public ReporterProperties<M, R> setSender(Sender<M, R> sender) {
     this.sender = sender;
     return this;
   }
@@ -36,7 +36,7 @@ public class ReporterProperties {
     return senderThreads;
   }
 
-  public ReporterProperties setSenderThreads(int senderThreads) {
+  public ReporterProperties<M, R> setSenderThreads(int senderThreads) {
     this.senderThreads = senderThreads;
     return this;
   }
@@ -45,7 +45,7 @@ public class ReporterProperties {
     return metrics;
   }
 
-  public ReporterProperties setMetrics(String metrics) {
+  public ReporterProperties<M, R> setMetrics(String metrics) {
     if (!metrics.equalsIgnoreCase("inmemory")) {
       throw new UnsupportedOperationException(metrics);
     }
@@ -57,7 +57,7 @@ public class ReporterProperties {
     return messageTimeoutNanos;
   }
 
-  public ReporterProperties setMessageTimeout(long messageTimeout, TimeUnit unit) {
+  public ReporterProperties<M, R> setMessageTimeout(long messageTimeout, TimeUnit unit) {
     this.messageTimeoutNanos = unit.toNanos(messageTimeout);
     return this;
   }
@@ -66,7 +66,7 @@ public class ReporterProperties {
     return pendingKeepaliveNanos;
   }
 
-  public ReporterProperties setPendingKeepaliveNanos(long pendingKeepalive, TimeUnit unit) {
+  public ReporterProperties<M, R> setPendingKeepaliveNanos(long pendingKeepalive, TimeUnit unit) {
     this.pendingKeepaliveNanos = unit.toNanos(pendingKeepalive);
     return this;
   }
@@ -75,7 +75,7 @@ public class ReporterProperties {
     return flushThreads;
   }
 
-  public ReporterProperties setFlushThreads(int flushThreads) {
+  public ReporterProperties<M, R> setFlushThreads(int flushThreads) {
     this.flushThreads = flushThreads;
     return this;
   }
@@ -84,7 +84,7 @@ public class ReporterProperties {
     return timerThreads;
   }
 
-  public ReporterProperties setTimerThreads(int timerThreads) {
+  public ReporterProperties<M, R> setTimerThreads(int timerThreads) {
     this.timerThreads = timerThreads;
     return this;
   }
@@ -93,7 +93,7 @@ public class ReporterProperties {
     return bufferedMaxMessages;
   }
 
-  public ReporterProperties setBufferedMaxMessages(int bufferedMaxMessages) {
+  public ReporterProperties<M, R> setBufferedMaxMessages(int bufferedMaxMessages) {
     this.bufferedMaxMessages = bufferedMaxMessages;
     return this;
   }
@@ -102,12 +102,12 @@ public class ReporterProperties {
     return pendingMaxMessages;
   }
 
-  public ReporterProperties setPendingMaxMessages(int pendingMaxMessages) {
+  public ReporterProperties<M, R> setPendingMaxMessages(int pendingMaxMessages) {
     this.pendingMaxMessages = pendingMaxMessages;
     return this;
   }
 
-  public ReporterProperties setMetricsExporter(String exporter) {
+  public ReporterProperties<M, R> setMetricsExporter(String exporter) {
     this.metricsExporter = exporter;
     return this;
   }
@@ -116,7 +116,7 @@ public class ReporterProperties {
     return this.metricsExporter;
   }
 
-  public ReporterProperties setSingleKey(boolean singleKey) {
+  public ReporterProperties<M, R> setSingleKey(boolean singleKey) {
     this.singleKey = singleKey;
     return this;
   }
@@ -129,13 +129,13 @@ public class ReporterProperties {
     return overflowStrategy;
   }
 
-  public ReporterProperties setOverflowStrategy(String overflowStrategy) {
+  public ReporterProperties<M, R> setOverflowStrategy(String overflowStrategy) {
     this.overflowStrategy = overflowStrategy;
     return this;
   }
 
-  AsyncReporter.Builder toBuilder() {
-    Builder builder = new Builder(sender)
+  AsyncReporter.Builder<M, R> toBuilder() {
+    Builder<M, R> builder = new Builder<>(sender)
         .senderThreads(senderThreads)
         .messageTimeout(messageTimeoutNanos, TimeUnit.NANOSECONDS)
         .pendingKeepalive(pendingKeepaliveNanos, TimeUnit.NANOSECONDS)
