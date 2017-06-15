@@ -13,8 +13,8 @@ fi
 if [[ $RELEASE ]]; then
   # Generate a gpg key
   cat > gen-key-script <<EOF
-       Key-Type: default
-       Subkey-Type: default
+       Key-Type: RSA
+       Subkey-Type: RSA
        Name-Real: buffer-slayer
        Name-Comment: buffer-slayer deployment key
        Name-Email: tramchamploo@gmail.com
