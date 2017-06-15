@@ -13,6 +13,8 @@ fi
 if [[ $RELEASE ]]; then
   mvn -B release:prepare -DreleaseVersion=$RELEASE -DdevelopmentVersion=$NEXT -Darguments=-DskipTests
   mvn -B release:perform --settings=".buildscript/settings.xml" -Prelease -Darguments=-DskipTests
+  # Checkout before commit
+  git pull origin
   # Modify version in README.md
   sed -i "s/<version>\(.*\)</<version>$RELEASE</" README.md
   git add README.md
