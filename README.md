@@ -26,7 +26,7 @@ Updates directly goes to the reporter and returns a `Promise` immediately.
 ### Quick-start
 ```xml
 <dependency>
-  <groupId>io.bufferslayer</groupId>
+  <groupId>io.github.tramchamploo</groupId>
   <artifactId>bufferslayer-spring-jdbc</artifactId>
   <version>1.2.4</version>
 </dependency>
