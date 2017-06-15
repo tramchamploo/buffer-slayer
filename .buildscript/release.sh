@@ -11,6 +11,7 @@ if [[ $GIT_USER_NAME ]]; then
 fi
 
 if [[ $RELEASE ]]; then
+  gpg --keyserver hkp://pool.sks-keyservers.net --recv-keys 2E52AC87
   mvn -B release:prepare -DreleaseVersion=$RELEASE -DdevelopmentVersion=$NEXT -Darguments=-DskipTests
   mvn -B release:perform --settings=".buildscript/settings.xml" -Prelease -Darguments=-DskipTests
   # Checkout before commit
