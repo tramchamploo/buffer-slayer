@@ -11,7 +11,17 @@ if [[ $GIT_USER_NAME ]]; then
 fi
 
 if [[ $RELEASE ]]; then
-  gpg --keyserver hkp://pool.sks-keyservers.net --recv-keys 2E52AC87
+  # Generate a gpg key
+  cat > gen-key-script <<EOF
+       Key-Type: default
+       Subkey-Type: default
+       Name-Real: buffer-slayer
+       Name-Comment: buffer-slayer deployment key
+       Name-Email: tramchamploo@gmail.com
+       Expire-Date: 0
+       Passphrase: $GPG_PASSPHRASE
+EOF
+  gpg --batch --gen-key gen-key-script
   # Checkout before commit
   git pull origin
   mvn -B release:prepare --settings=".buildscript/settings.xml" -Prelease -DreleaseVersion=$RELEASE -DdevelopmentVersion=$NEXT -Darguments=-DskipTests
