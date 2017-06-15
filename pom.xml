@@ -39,6 +39,7 @@
     <maven-jar-plugin.version>3.0.2</maven-jar-plugin.version>
     <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
     <maven-shade-plugin.version>2.4.3</maven-shade-plugin.version>
+    <maven-gpg-plugin.version>1.6</maven-gpg-plugin.version>
     <slf4j.version>1.7.12</slf4j.version>
   </properties>
 
@@ -213,6 +214,11 @@
           <artifactId>maven-release-plugin</artifactId>
           <version>${maven-release-plugin.version}</version>
         </plugin>
+
+        <plugin>
+          <artifactId>maven-gpg-plugin</artifactId>
+          <version>${maven-gpg-plugin.version}</version>
+        </plugin>
       </plugins>
     </pluginManagement>
 
@@ -260,6 +266,20 @@
                   <goal>jar</goal>
                 </goals>
                 <phase>package</phase>
+              </execution>
+            </executions>
+          </plugin>
+          <!-- Signs artifacts with GnuPG -->
+          <plugin>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>${maven-gpg-plugin.version}</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
               </execution>
             </executions>
           </plugin>
