@@ -12,10 +12,10 @@ fi
 
 if [[ $RELEASE ]]; then
   gpg --keyserver hkp://pool.sks-keyservers.net --recv-keys 2E52AC87
-  mvn -B release:prepare -DreleaseVersion=$RELEASE -DdevelopmentVersion=$NEXT -Darguments=-DskipTests
-  mvn -B release:perform --settings=".buildscript/settings.xml" -Prelease -Darguments=-DskipTests
   # Checkout before commit
   git pull origin
+  mvn -B release:prepare -DreleaseVersion=$RELEASE -DdevelopmentVersion=$NEXT -Darguments=-DskipTests
+  mvn -B release:perform --settings=".buildscript/settings.xml" -Prelease -Darguments=-DskipTests
   # Modify version in README.md
   sed -i "s/<version>\(.*\)</<version>$RELEASE</" README.md
   git add README.md
