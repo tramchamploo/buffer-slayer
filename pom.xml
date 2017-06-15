@@ -281,8 +281,8 @@
                   <goal>sign</goal>
                 </goals>
                 <configuration>
-                  <keyname>2E52AC87</keyname>
-                  <passphraseServerId>2E52AC87</passphraseServerId>
+                  <keyname>buffer-slayer</keyname>
+                  <passphraseServerId>buffer-slayer</passphraseServerId>
                 </configuration>
               </execution>
             </executions>

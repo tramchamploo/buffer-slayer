@@ -6,7 +6,7 @@
       <password>${env.CI_DEPLOY_PASSWORD}</password>
     </server>
     <server>
-      <id>2E52AC87</id>
+      <id>buffer-slayer</id>
       <passphrase>${env.GPG_PASSPHRASE}</passphrase>
     </server>
   </servers>
