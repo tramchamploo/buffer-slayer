@@ -1,4 +1,5 @@
 [![CircleCI](https://circleci.com/gh/tramchamploo/buffer-slayer.svg?style=svg)](https://circleci.com/gh/tramchamploo/buffer-slayer)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.github.tramchamploo/bufferslayer-core/badge.svg)](https://maven-badges.herokuapp.com/maven-central/io.github.tramchamploo/bufferslayer-core)
 [ ![Download](https://api.bintray.com/packages/tramchamploo/tramchamploo/buffer-slayer/images/download.svg) ](https://bintray.com/tramchamploo/tramchamploo/buffer-slayer/_latestVersion)
 
 # buffer-slayer
