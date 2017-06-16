@@ -134,7 +134,7 @@ public class ReporterProperties<M extends Message, R> {
     return this;
   }
 
-  AsyncReporter.Builder<M, R> toBuilder() {
+  public AsyncReporter.Builder<M, R> toBuilder() {
     Builder<M, R> builder = new Builder<>(sender)
         .senderThreads(senderThreads)
         .messageTimeout(messageTimeoutNanos, TimeUnit.NANOSECONDS)
