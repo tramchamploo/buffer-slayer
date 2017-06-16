@@ -7,6 +7,8 @@ dependencies:
     - openssl aes-256-cbc -d -in .buildscript/secret-env-cipher -k $KEY >> ~/.circlerc
   override:
     - mvn --fail-never dependency:go-offline || true
+  cache_directories:
+    - "~/.m2"
 
 test:
   post:
