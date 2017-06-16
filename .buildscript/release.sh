@@ -26,6 +26,7 @@ EOF
 
   # Publish public key to key server
   key_id=$(gpg --list-keys | grep -B1 buffer-slayer | head -1 | awk '{print $2}' | awk -F '/' '{print $2}')
+  gpg --keyserver hkp://keyserver.ubuntu.com --send-keys $key_id
   gpg --keyserver hkp://pool.sks-keyservers.net --send-keys $key_id
 
   # Checkout before commit
