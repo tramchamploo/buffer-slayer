@@ -1,6 +1,9 @@
 package io.github.tramchamploo.bufferslayer;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Arrays;
 import org.springframework.jdbc.core.PreparedStatementSetter;
 
@@ -11,9 +14,9 @@ import org.springframework.jdbc.core.PreparedStatementSetter;
 final class Sql extends Message {
 
   final String sql;
-  final PreparedStatementSetter statementSetter;
-  final Object[] args;
-  final int[] argTypes;
+  transient final PreparedStatementSetter statementSetter;
+  transient Object[] args;
+  transient final int[] argTypes;
 
   static Builder builder() {
     return new Builder();
@@ -44,6 +47,29 @@ final class Sql extends Message {
           Arrays.toString(argTypes));
     }
     return "sql: " + sql;
+  }
+
+  private void writeObject(ObjectOutputStream s) throws IOException {
+    s.defaultWriteObject();
+    // write length of args
+    s.writeInt(args.length);
+    // write args
+    if (args.length > 0) {
+      for (Object arg : args) {
+        s.writeObject(arg);
+      }
+    }
+  }
+
+  private void readObject(ObjectInputStream s) throws IOException, ClassNotFoundException  {
+    s.defaultReadObject();
+    // read length of args
+    int argCount = s.readInt();
+    // read args
+    args = new Object[argCount];
+    for (int i = 0; i < argCount; i++) {
+      args[i] = s.readObject();
+    }
   }
 
   static final class Builder {
