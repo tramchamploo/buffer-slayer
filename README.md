@@ -51,7 +51,7 @@ promise.done(success -> ...)
 
 ## Usage
 
-### [ReporterProperties](boundedqueue/src/main/java/io/bufferslayer/ReporterProperties.java)
+### [ReporterProperties](boundedqueue/src/main/java/io/github/tramchamploo/bufferslayer/ReporterProperties.java)
 This is where you configure all properties.
 
 * `sender`: Sender that messages are flushed into. Necessary but often not needed for users to configure. Implementations like `JdbcTemplate` will configure it by itself.
@@ -84,13 +84,13 @@ BatchJdbcTemplateBenchmark.no_contention_unbatched          thrpt   15     198.5
 
 ## Components
 
-### [Reporter](core/src/main/java/io/bufferslayer/Reporter.java)
+### [Reporter](core/src/main/java/io/github/tramchamploo/bufferslayer/Reporter.java)
 It sends requests to a queue and keeps flushing them to consumer.
 
-### [Sender](core/src/main/java/io/bufferslayer/Sender.java)
+### [Sender](core/src/main/java/io/github/tramchamploo/bufferslayer/Sender.java)
 Sending the messages that the buffer drained in batch.
 
-### [SizeBoundedQueue](boundedqueue/src/main/java/io/bufferslayer/SizeBoundedQueue.java)
+### [SizeBoundedQueue](boundedqueue/src/main/java/io/github/tramchamploo/bufferslayer/SizeBoundedQueue.java)
 A queue that bounded by a specific size. Supports multi producers in parallel. 
 It supports overflow strategies as listed.
 
@@ -103,9 +103,9 @@ It supports overflow strategies as listed.
 
 Strategies above are inspired by Akka stream. 
 
-### [QueueRecycler](boundedqueue/src/main/java/io/bufferslayer/QueueRecycler.java)
-A recycler that manages `SizeBoundedQueue`'s lifecycle. 
-A queue can be created, leased, recycled and destoryed over it.
+### [QueueManager](boundedqueue/src/main/java/io/github/tramchamploo/bufferslayer/QueueManager.java)
+Manages `SizeBoundedQueue`'s lifecycle. 
+Be responsible for queue creation and destroy.
 
-### [BufferNextMessage](boundedqueue/src/main/java/io/bufferslayer/BufferNextMessage.java)
+### [Buffer](boundedqueue/src/main/java/io/github/tramchamploo/bufferslayer/Buffer.java)
 A list with a fixed size that can only be drained when a timeout is reached or is full.
