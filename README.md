@@ -106,7 +106,7 @@ Strategies above are inspired by Akka stream.
 
 ### [QueueManager](boundedqueue/src/main/java/io/github/tramchamploo/bufferslayer/QueueManager.java)
 Manages `SizeBoundedQueue`'s lifecycle. 
-Be responsible for queue creation and destroy.
+Be responsible for queue creation and destruction.
 
 ### [Buffer](boundedqueue/src/main/java/io/github/tramchamploo/bufferslayer/Buffer.java)
 A list with a fixed size that can only be drained when a timeout is reached or is full.
