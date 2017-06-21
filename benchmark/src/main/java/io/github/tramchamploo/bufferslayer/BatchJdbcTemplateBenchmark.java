@@ -41,7 +41,7 @@ public class BatchJdbcTemplateBenchmark {
   private DriverManagerDataSource dataSource;
   private BatchJdbcTemplate batch;
   private JdbcTemplate unbatch;
-  private AsyncReporter reporter;
+  private AsyncReporter<Sql, Integer> reporter;
   private static SenderProxy proxy;
   private static AtomicLong counter = new AtomicLong();
 
@@ -117,32 +117,32 @@ public class BatchJdbcTemplateBenchmark {
 
   @Benchmark @Group("no_contention_batched") @GroupThreads(1)
   public void no_contention_batched_insert(Lagging l, AtomicLongCounter counters) {
-    batch.update(INSERTION, new Object[]{randomString(), new Date()});
+    batch.update(INSERTION, randomString(), new Date());
   }
 
   @Benchmark @Group("no_contention_unbatched") @GroupThreads(1)
   public void no_contention_unbatched_insert(Lagging l) {
-    unbatch.update(INSERTION, new Object[]{randomString(), new Date()});
+    unbatch.update(INSERTION, randomString(), new Date());
   }
 
   @Benchmark @Group("mild_contention_batched") @GroupThreads(2)
   public void mild_contention_batched_insert(Lagging l, AtomicLongCounter counters) {
-    batch.update(INSERTION, new Object[]{randomString(), new Date()});
+    batch.update(INSERTION, randomString(), new Date());
   }
 
   @Benchmark @Group("mild_contention_unbatched") @GroupThreads(2)
   public void mild_contention_unbatched_insert(Lagging l) {
-    unbatch.update(INSERTION, new Object[]{randomString(), new Date()});
+    unbatch.update(INSERTION, randomString(), new Date());
   }
 
   @Benchmark @Group("high_contention_batched") @GroupThreads(8)
   public void high_contention_batched_insert(Lagging l, AtomicLongCounter counters) {
-    batch.update(INSERTION, new Object[]{randomString(), new Date()});
+    batch.update(INSERTION, randomString(), new Date());
   }
 
   @Benchmark @Group("high_contention_unbatched") @GroupThreads(8)
   public void high_contention_unbatched_insert(Lagging l) {
-    unbatch.update(INSERTION, new Object[]{randomString(), new Date()});
+    unbatch.update(INSERTION, randomString(), new Date());
   }
 
   public static void main(String[] args) throws RunnerException {

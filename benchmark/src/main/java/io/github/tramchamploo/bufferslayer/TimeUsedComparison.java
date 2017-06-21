@@ -53,7 +53,7 @@ public class TimeUsedComparison {
       }
     });
 
-    AsyncReporter reporter = AsyncReporter.builder(proxy)
+    AsyncReporter<Sql, Integer> reporter = AsyncReporter.builder(proxy)
         .pendingMaxMessages(6000)
         .bufferedMaxMessages(100)
         .messageTimeout(50, TimeUnit.MILLISECONDS)
@@ -75,9 +75,9 @@ public class TimeUsedComparison {
 
     long start = System.nanoTime();
     for (int i = 0; i < 5000; i++) {
-      batch.update(INSERTION, new Object[] {randomString(), new Date()});
+      batch.update(INSERTION, randomString(), new Date());
       if (i % 100 == 0) {
-        batch.update(MODIFICATION, new Object[] {randomString(), random.nextInt(i + 1) + 1});
+        batch.update(MODIFICATION, randomString(), random.nextInt(i + 1) + 1);
       }
     }
     countDown.await();
@@ -90,9 +90,9 @@ public class TimeUsedComparison {
     unbatch.update(CREATE_TABLE);
     start = System.nanoTime();
     for (int i = 0; i < 5000; i++) {
-      unbatch.update(INSERTION, new Object[] {randomString(), new Date()});
+      unbatch.update(INSERTION, randomString(), new Date());
       if (i % 100 == 0) {
-        unbatch.update(MODIFICATION, new Object[] {randomString(), random.nextInt(i + 1) + 1});
+        unbatch.update(MODIFICATION, randomString(), random.nextInt(i + 1) + 1);
       }
     }
     used = System.nanoTime() - start;
