@@ -16,6 +16,8 @@ import java.util.concurrent.TimeUnit;
 import org.jdeferred.Deferred;
 import org.jdeferred.Promise;
 import org.jdeferred.impl.DeferredObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Created by tramchamploo on 2017/4/14.
@@ -24,6 +26,7 @@ final class SenderToAsyncSenderAdaptor<M extends Message, R> implements AsyncSen
 
   final Sender<M, R> delegate;
   final Executor executor;
+  static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
 
   SenderToAsyncSenderAdaptor(Sender<M, R> delegate, long reporterId, int senderThreads) {
     this.delegate = checkNotNull(delegate);
@@ -43,6 +46,7 @@ final class SenderToAsyncSenderAdaptor<M extends Message, R> implements AsyncSen
 
   @Override
   public Promise<List<R>, MessageDroppedException, ?> send(final List<M> messages) {
+    logger.debug("Sending {} messages.", messages.size());
     final Deferred<List<R>, MessageDroppedException, ?> result = new DeferredObject<>();
     executor.execute(new Runnable() {
       @Override

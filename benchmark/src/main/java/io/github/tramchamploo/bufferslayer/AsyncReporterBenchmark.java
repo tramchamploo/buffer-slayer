@@ -29,6 +29,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @State(Scope.Group)
+@SuppressWarnings("unchecked")
 public class AsyncReporterBenchmark {
 
   static Sender sender = new NoopSender();

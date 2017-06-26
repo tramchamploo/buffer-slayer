@@ -80,7 +80,7 @@ class QueueManager {
         queue = new SizeBoundedQueue(pendingMaxMessages, overflowStrategy, key);
         keyToQueue.put(key, queue);
         onCreate(queue);
-        logger.info("Queue created, key: {}", key);
+        logger.debug("Queue created, key: {}", key);
       }
       keyToLastGet.put(key, now());
       return queue;
@@ -97,7 +97,7 @@ class QueueManager {
    * set a callback for queue creation
    * @param callback callback to trigger after a queue is created
    */
-  void createCallback(Callback callback) {
+  void onCreate(Callback callback) {
     createCallback = callback;
   }
 
@@ -124,7 +124,7 @@ class QueueManager {
       lock.unlock();
     }
     if (!result.isEmpty()) {
-      logger.info("Timeout queues removed, keys: {}", result);
+      logger.debug("Timeout queues removed, keys: {}", result);
     }
     return result;
   }

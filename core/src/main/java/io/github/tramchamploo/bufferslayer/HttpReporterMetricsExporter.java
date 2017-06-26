@@ -1,5 +1,7 @@
 package io.github.tramchamploo.bufferslayer;
 
+import static io.github.tramchamploo.bufferslayer.internal.Util.propertyOr;
+
 import fi.iki.elonen.NanoHTTPD;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -14,7 +16,7 @@ import org.slf4j.LoggerFactory;
 public class HttpReporterMetricsExporter extends ReporterMetricsExporter {
 
   private static final Logger logger = LoggerFactory.getLogger(HttpReporterMetricsExporter.class);
-  static final int PORT = 15090;
+  static final int PORT = propertyOr("bufferslayer.metrics.http.port", 15090);
 
   private class HttpServer extends NanoHTTPD {
 

@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Arrays;
+import org.springframework.jdbc.core.ArgumentPreparedStatementSetter;
+import org.springframework.jdbc.core.ArgumentTypePreparedStatementSetter;
 import org.springframework.jdbc.core.PreparedStatementSetter;
 
 /**
@@ -40,9 +42,9 @@ final class Sql extends Message {
 
   @Override
   public String toString() {
-    if (prepared() && statementSetter instanceof ArgPreparedStatementSetter) {
+    if (prepared() && statementSetter instanceof ArgumentPreparedStatementSetter) {
       return String.format("sql: %s, args: %s", sql, Arrays.toString(args));
-    } else if (prepared() && statementSetter instanceof ArgTypePreparedStatementSetter) {
+    } else if (prepared() && statementSetter instanceof ArgumentTypePreparedStatementSetter) {
       return String.format("sql: %s, args: %s, argTypes: %s", sql, Arrays.toString(args),
           Arrays.toString(argTypes));
     }
@@ -92,9 +94,9 @@ final class Sql extends Message {
     Builder args(Object[] args) {
       this.args = args;
       if (argTypes != null) {
-        this.preparedStatementSetter = new ArgTypePreparedStatementSetter(args, argTypes);
+        this.preparedStatementSetter = new ArgumentTypePreparedStatementSetter(args, argTypes);
       } else {
-        this.preparedStatementSetter = new ArgPreparedStatementSetter(args);
+        this.preparedStatementSetter = new ArgumentPreparedStatementSetter(args);
       }
       return this;
     }
@@ -102,7 +104,7 @@ final class Sql extends Message {
     Builder argTypes(int[] argTypes) {
       this.argTypes = argTypes;
       if (args != null) {
-        this.preparedStatementSetter = new ArgTypePreparedStatementSetter(args, argTypes);
+        this.preparedStatementSetter = new ArgumentTypePreparedStatementSetter(args, argTypes);
       }
       return this;
     }

@@ -1,5 +1,7 @@
 package io.github.tramchamploo.bufferslayer;
 
+import static io.github.tramchamploo.bufferslayer.internal.Util.propertyOr;
+
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -14,6 +16,8 @@ public class LogReporterMetricsExporter extends ReporterMetricsExporter {
   private static final Logger logger = LoggerFactory.getLogger(LogReporterMetricsExporter.class);
   private ScheduledExecutorService executor;
 
+  static final int DELAY = propertyOr("bufferslayer.metrics.log.delayInSeconds", 5);
+
   @Override
   public void start(final ReporterMetrics metrics) {
     executor = Executors.newSingleThreadScheduledExecutor();
@@ -23,7 +27,7 @@ public class LogReporterMetricsExporter extends ReporterMetricsExporter {
         logger.info("Messages: {}\nMessagesDropped: {}\nQueuedMessages: {}",
             metrics.messages(), metrics.messagesDropped(), metrics.queuedMessages());
       }
-    }, 5, 5, TimeUnit.SECONDS);
+    }, DELAY, DELAY, TimeUnit.SECONDS);
   }
 
   @Override

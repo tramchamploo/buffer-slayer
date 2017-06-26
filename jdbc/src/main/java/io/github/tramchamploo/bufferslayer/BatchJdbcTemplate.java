@@ -57,17 +57,17 @@ public class BatchJdbcTemplate {
     this.reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate)).build();
   }
 
-  public BatchJdbcTemplate(ReporterProperties properties) {
+  public BatchJdbcTemplate(ReporterProperties<Sql, Integer> properties) {
     this.delegate = new JdbcTemplate();
     this.reporter = properties.setSender(new JdbcTemplateSender(delegate)).toBuilder().build();
   }
 
-  public BatchJdbcTemplate(DataSource dataSource, ReporterProperties properties) {
+  public BatchJdbcTemplate(DataSource dataSource, ReporterProperties<Sql, Integer> properties) {
     this.delegate = new JdbcTemplate(dataSource);
     this.reporter = properties.setSender(new JdbcTemplateSender(delegate)).toBuilder().build();
   }
 
-  public BatchJdbcTemplate(DataSource dataSource, boolean lazyInit, ReporterProperties properties) {
+  public BatchJdbcTemplate(DataSource dataSource, boolean lazyInit, ReporterProperties<Sql, Integer> properties) {
     this.delegate = new JdbcTemplate(dataSource, lazyInit);
     this.reporter = properties.setSender(new JdbcTemplateSender(delegate)).toBuilder().build();
   }
