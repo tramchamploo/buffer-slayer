@@ -78,7 +78,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey>
           new ScheduledThreadPoolExecutor(builder.timerThreads, timerFactory);
       timerPool.setRemoveOnCancelPolicy(true);
       this.scheduler = timerPool;
-      this.queueManager.createCallback(new Callback() {
+      this.queueManager.onCreate(new Callback() {
         @Override
         public void call(SizeBoundedQueue queue) {
           schedulePeriodically(queue.key, messageTimeoutNanos);

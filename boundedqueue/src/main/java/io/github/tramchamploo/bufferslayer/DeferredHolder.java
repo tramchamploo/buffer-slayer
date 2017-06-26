@@ -27,6 +27,7 @@ class DeferredHolder {
     }
   }
 
+  @SuppressWarnings("unchecked")
   static boolean resolve(Long id, Object resolve) {
     Deferred deferred = holder.get(id);
     boolean success = !deferred.isRejected();
@@ -44,6 +45,7 @@ class DeferredHolder {
     }
   }
 
+  @SuppressWarnings("unchecked")
   private static Deferred doReject(Message message, MessageDroppedException ex) {
     Deferred deferred = holder.get(message.id);
     deferred.reject(ex);

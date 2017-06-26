@@ -35,7 +35,7 @@ public class QueueManagerTest {
   public void callbackTriggeredAfterCreated() throws InterruptedException {
     CountDownLatch countDown = new CountDownLatch(1);
     AtomicInteger callCount = new AtomicInteger();
-    manager.createCallback(new Callback() {
+    manager.onCreate(new Callback() {
       @Override
       public void call(SizeBoundedQueue queue) {
         assertEquals(Message.SINGLE_KEY, queue.key);

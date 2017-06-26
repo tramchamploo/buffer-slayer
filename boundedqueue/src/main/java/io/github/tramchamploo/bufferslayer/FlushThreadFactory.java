@@ -48,6 +48,7 @@ class FlushThreadFactory {
     });
   }
 
+  @SuppressWarnings("unchecked")
   private void reScheduleAndFlush(SizeBoundedQueue q) {
     try {
       while (q.size() >= reporter.bufferedMaxMessages) {

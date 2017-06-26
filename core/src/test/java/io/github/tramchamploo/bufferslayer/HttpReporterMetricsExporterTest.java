@@ -2,6 +2,7 @@ package io.github.tramchamploo.bufferslayer;
 
 import static org.junit.Assert.assertEquals;
 
+import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
 import java.io.IOException;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
