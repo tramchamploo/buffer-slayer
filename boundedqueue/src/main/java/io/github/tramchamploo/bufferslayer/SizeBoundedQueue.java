@@ -36,7 +36,7 @@ final class SizeBoundedQueue {
 
   static final int DEFAULT_CAPACITY = 10;
 
-  final ReentrantLock lock = new ReentrantLock(true);
+  final ReentrantLock lock = new ReentrantLock(false);
   final Condition notEmpty = lock.newCondition();
   final Condition notFull = lock.newCondition();
 
