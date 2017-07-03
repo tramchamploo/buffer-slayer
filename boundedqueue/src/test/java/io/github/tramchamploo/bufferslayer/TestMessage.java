@@ -45,6 +45,6 @@ public class TestMessage extends Message {
 
   @Override
   public String toString() {
-    return "TestMessage(" + id + ")";
+    return "TestMessage(" + key + ")";
   }
 }
