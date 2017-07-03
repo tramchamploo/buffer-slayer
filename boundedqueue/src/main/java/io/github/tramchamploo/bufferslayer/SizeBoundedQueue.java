@@ -1,5 +1,6 @@
 package io.github.tramchamploo.bufferslayer;
 
+import static io.github.tramchamploo.bufferslayer.DeferredHolder.reject;
 import static io.github.tramchamploo.bufferslayer.MessageDroppedException.dropped;
 import static io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy.DropBuffer;
 import static io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy.DropHead;
@@ -33,22 +34,24 @@ final class SizeBoundedQueue {
     boolean accept(Message next);
   }
 
-  final ReentrantLock lock = new ReentrantLock(false);
+  static final int DEFAULT_CAPACITY = 10;
+
+  final ReentrantLock lock = new ReentrantLock(true);
   final Condition notEmpty = lock.newCondition();
   final Condition notFull = lock.newCondition();
 
   final int maxSize;
   final Strategy overflowStrategy;
-
-  final Message[] elements;
   final MessageKey key;
 
+  Message[] elements;
   int count;
   int writePos;
   int readPos;
 
   SizeBoundedQueue(int maxSize, Strategy overflowStrategy, MessageKey key) {
-    this.elements = new Message[maxSize];
+    int initialCapacity = DEFAULT_CAPACITY > maxSize ? maxSize : DEFAULT_CAPACITY;
+    this.elements = new Message[initialCapacity];
     this.maxSize = maxSize;
     this.overflowStrategy = overflowStrategy;
     this.key = key;
@@ -66,29 +69,30 @@ final class SizeBoundedQueue {
   void offer(Message next, Deferred<?, MessageDroppedException, Integer> deferred) {
     lock.lock();
     try {
+      ensureCapacity(count + 1);
       if (isFull()) {
         switch (overflowStrategy) {
           case DropNew:
-            DeferredHolder.reject(dropped(DropNew, next));
+            reject(dropped(DropNew, next));
             return;
           case DropTail:
             Message tail = dropTail();
             enqueue(next);
             deferred.notify(1);
-            DeferredHolder.reject(dropped(DropTail, tail));
+            reject(dropped(DropTail, tail));
             return;
           case DropHead:
             Message head = dropHead();
             enqueue(next);
             deferred.notify(1);
-            DeferredHolder.reject(dropped(DropHead, head));
+            reject(dropped(DropHead, head));
             return;
           case DropBuffer:
             List<Message> allElements = removeAll();
             doClear();
             enqueue(next);
             deferred.notify(1);
-            DeferredHolder.reject(dropped(DropBuffer, allElements));
+            reject(dropped(DropBuffer, allElements));
             return;
           case Block:
             break;
@@ -101,6 +105,30 @@ final class SizeBoundedQueue {
     } finally {
       lock.unlock();
     }
+  }
+
+  private void ensureCapacity(int minCapacity) {
+    if (minCapacity > elements.length && minCapacity <= maxSize) {
+      int oldCapacity = elements.length;
+      int newCapacity = oldCapacity + (oldCapacity >> 1);
+      if (newCapacity < minCapacity)
+        newCapacity = minCapacity;
+      if (newCapacity > maxSize)
+        newCapacity = maxSize;
+      // minCapacity is usually close to size, so this is a win:
+      elements = Arrays.copyOf(elements, newCapacity);
+      resetPositions(oldCapacity);
+    }
+  }
+
+  private void resetPositions(int oldCapacity) {
+    writePos = oldCapacity;
+
+    int index = 0;
+    while (elements[index] == null && index < elements.length) {
+      index++;
+    }
+    readPos = index;
   }
 
   private boolean isFull() {
@@ -185,7 +213,7 @@ final class SizeBoundedQueue {
 
         elements[readPos] = null;
         if (++readPos == elements.length) {
-          readPos = 0; // circle back to the front dropped the array
+          readPos = 0; // circle back to the front of the array
         }
       } else {
         break;
@@ -199,7 +227,7 @@ final class SizeBoundedQueue {
   }
 
   /**
-   * Clears the queue unconditionally and returns count dropped elements cleared.
+   * Clears the queue unconditionally and returns count of elements cleared.
    */
   int clear() {
     lock.lock();

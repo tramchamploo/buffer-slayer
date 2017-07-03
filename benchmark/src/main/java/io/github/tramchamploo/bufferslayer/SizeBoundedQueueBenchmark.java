@@ -59,7 +59,7 @@ public class SizeBoundedQueueBenchmark {
     public int offersMade;
     public int offersFailed;
 
-    public void addCallback(Deferred<?, ?, ?> deferred) {
+    void addCallback(Deferred<?, ?, ?> deferred) {
       deferred.promise()
           .progress(i -> offersMade += 1)
           .fail(f -> offersFailed += 1);
