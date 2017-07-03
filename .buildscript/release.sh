@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -o pipefail
 
 if [[ $GIT_USER_EMAIL ]]; then
   git config --global user.email "$GIT_USER_EMAIL"
@@ -31,9 +31,16 @@ EOF
 
   # Checkout before commit
   git pull origin
-  mvn -B release:prepare --settings=".buildscript/settings.xml" -Prelease -DreleaseVersion=$RELEASE -DdevelopmentVersion=$NEXT -Darguments=-DskipTests
-  mvn -B release:perform --settings=".buildscript/settings.xml" -Prelease -Darguments=-DskipTests
 
+  mvn -B release:prepare --settings=".buildscript/settings.xml" -Prelease -DreleaseVersion=$RELEASE -DdevelopmentVersion=$NEXT -Darguments="-DskipTests"
+
+  if [ $? -eq 0 ]; then
+    mvn -B release:perform --settings=".buildscript/settings.xml" -Prelease -Darguments="-DskipTests"
+  else
+    echo "Error preparing a release, rolling back..."
+    mvn -B release:rollback
+    exit 1
+  fi
   # Modify version in README.md
   sed -i "s/<version>\(.*\)</<version>$RELEASE</" README.md
   git add README.md
