@@ -21,6 +21,7 @@
     <module>boundedqueue</module>
     <module>jdbc</module>
     <module>benchmark</module>
+    <module>rx</module>
   </modules>
 
   <properties>
@@ -81,15 +82,15 @@
 
       <dependency>
         <groupId>${project.groupId}</groupId>
-        <artifactId>bufferslayer-boundedqueue</artifactId>
+        <artifactId>bufferslayer-core</artifactId>
         <version>${project.version}</version>
+        <type>test-jar</type>
       </dependency>
 
       <dependency>
         <groupId>${project.groupId}</groupId>
         <artifactId>bufferslayer-boundedqueue</artifactId>
         <version>${project.version}</version>
-        <type>test-jar</type>
       </dependency>
 
       <dependency>
@@ -103,6 +104,12 @@
         <artifactId>bufferslayer-spring-jdbc</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
+      </dependency>
+
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>bufferslayer-rx</artifactId>
+        <version>${project.version}</version>
       </dependency>
 
       <dependency>

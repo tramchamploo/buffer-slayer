@@ -10,7 +10,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
 import io.github.tramchamploo.bufferslayer.QueueManager.Callback;
-import io.github.tramchamploo.bufferslayer.internal.Component;
 import java.io.Flushable;
 import java.util.Collection;
 import java.util.List;
@@ -33,8 +32,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Created by tramchamploo on 2017/2/28.
  */
-public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey>
-    implements Reporter<M, R>, Flushable, Component {
+public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> implements Reporter<M, R>, Flushable {
 
   static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
   static final int DEFAULT_TIMER_THREADS = Runtime.getRuntime().availableProcessors();
@@ -66,7 +64,8 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey>
     this.singleKey = builder.singleKey;
     this.flushThreads = builder.flushThreads;
     this.queueManager = new QueueManager(builder.pendingMaxMessages,
-        builder.overflowStrategy, builder.pendingKeepaliveNanos);
+                                         builder.overflowStrategy,
+                                         builder.pendingKeepaliveNanos);
     this.flushThreadFactory = new FlushThreadFactory(this);
     this.bufferPool = new BufferPool(MAX_BUFFER_POOL_ENTRIES, builder.bufferedMaxMessages, builder.singleKey);
     if (messageTimeoutNanos > 0) {
@@ -74,8 +73,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey>
                                       .setNameFormat("AsyncReporter-" + id + "-timer-%d")
                                       .setDaemon(true)
                                       .build();
-      ScheduledThreadPoolExecutor timerPool =
-          new ScheduledThreadPoolExecutor(builder.timerThreads, timerFactory);
+      ScheduledThreadPoolExecutor timerPool = new ScheduledThreadPoolExecutor(builder.timerThreads, timerFactory);
       timerPool.setRemoveOnCancelPolicy(true);
       this.scheduler = timerPool;
       this.queueManager.onCreate(new Callback() {
@@ -91,51 +89,21 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey>
     return new Builder<>(sender);
   }
 
-  public static final class Builder<M extends Message, R> {
+  public static final class Builder<M extends Message, R> extends Reporter.Builder<Builder<M, R>, M, R> {
 
-    final Sender<M, R> sender;
     int senderThreads = 1;
-    ReporterMetrics metrics = ReporterMetrics.NOOP_METRICS;
-    long messageTimeoutNanos = TimeUnit.SECONDS.toNanos(1);
-    int bufferedMaxMessages = 100;
-    int pendingMaxMessages = 10000;
     int flushThreads = 1;
     int timerThreads = DEFAULT_TIMER_THREADS;
     long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
     boolean singleKey = false;
-    Strategy overflowStrategy = Strategy.DropHead;
 
     Builder(Sender<M, R> sender) {
-      checkNotNull(sender, "sender");
-      this.sender = sender;
+      super(sender);
     }
 
     public Builder<M, R> senderThreads(int senderThreads) {
       checkArgument(senderThreads > 0, "senderThreads > 0: %s", senderThreads);
       this.senderThreads = senderThreads;
-      return this;
-    }
-
-    public Builder<M, R> metrics(ReporterMetrics metrics) {
-      this.metrics = checkNotNull(metrics, "metrics");
-      return this;
-    }
-
-    public Builder<M, R> messageTimeout(long timeout, TimeUnit unit) {
-      checkArgument(timeout >= 0, "timeout >= 0: %s", timeout);
-      this.messageTimeoutNanos = unit.toNanos(timeout);
-      return this;
-    }
-
-    public Builder<M, R> bufferedMaxMessages(int bufferedMaxMessages) {
-      checkArgument(bufferedMaxMessages > 0, "bufferedMaxMessages > 0: %s", bufferedMaxMessages);
-      this.bufferedMaxMessages = bufferedMaxMessages;
-      return this;
-    }
-
-    public Builder<M, R> pendingMaxMessages(int pendingMaxMessages) {
-      checkArgument(pendingMaxMessages > 0, "pendingMaxMessages > 0: %s", pendingMaxMessages);
-      this.pendingMaxMessages = pendingMaxMessages;
       return this;
     }
 
@@ -159,11 +127,6 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey>
 
     public Builder<M, R> singleKey(boolean singleKey) {
       this.singleKey = singleKey;
-      return this;
-    }
-
-    public Builder<M, R> overflowStrategy(Strategy overflowStrategy) {
-      this.overflowStrategy = overflowStrategy;
       return this;
     }
 
@@ -191,7 +154,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey>
     if (closed.get()) { // Drop the message when closed.
       DeferredObject<R, MessageDroppedException, Integer> deferred = new DeferredObject<>();
       deferred.reject(dropped(new IllegalStateException("closed!"), singletonList(message)));
-      return deferred.promise();
+      return deferred.promise().fail(metricsCallback());
     }
 
     // Lazy initialize flush threads

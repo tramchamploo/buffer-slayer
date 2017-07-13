@@ -5,6 +5,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -214,6 +215,22 @@ public class AsyncReporterTest {
     reporter.report(newMessage(0));
     sender.close();
     reporter.flush();
+
+    assertEquals(1, metrics.messagesDropped());
+  }
+
+
+  @Test
+  public void dropWhenReporterClosed() throws IOException {
+    FakeSender sender = new FakeSender();
+
+    reporter = AsyncReporter.builder(sender)
+        .metrics(metrics)
+        .messageTimeout(1, TimeUnit.MILLISECONDS)
+        .build();
+
+    reporter.close();
+    reporter.report(newMessage(0));
 
     assertEquals(1, metrics.messagesDropped());
   }
