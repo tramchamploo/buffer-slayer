@@ -33,8 +33,26 @@ Updates directly goes to the reporter and returns a `Promise` immediately.
 </dependency>
 ```
 
+For **native** implementation:
+```xml
+<dependency>
+  <groupId>io.github.tramchamploo</groupId>
+  <artifactId>bufferslayer-boundedqueue</artifactId>
+  <version>1.3.1</version>
+</dependency>
+```
+
+For **rx-java** implementation:
+```xml
+<dependency>
+  <groupId>io.github.tramchamploo</groupId>
+  <artifactId>bufferslayer-rx</artifactId>
+  <version>1.3.1</version>
+</dependency>
+```
+
 ```java
-ReporterProperties reporterProperties = new ReporterProperties()
+AsyncReporterProperties reporterProperties = new AsyncReporterProperties()
         .setFlushThreads(5)
         .setSenderThreads(10)
         .setBufferedMaxMessages(500)
@@ -42,8 +60,7 @@ ReporterProperties reporterProperties = new ReporterProperties()
         .setMetrics("inmemory")
         .setMetricsExporter("http");
 
-BatchJdbcTemplate template = new BatchJdbcTemplate(reporterProperties);
-template.setDataSource(dataSource);
+BatchJdbcTemplate template = new BatchJdbcTemplate(yourFormerJdbcTemplate, reporterProperties);
 
 Promise promise = template.update(...);
 promise.done(success -> ...)

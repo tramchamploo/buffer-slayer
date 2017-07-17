@@ -4,7 +4,6 @@ import java.util.Date;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -12,7 +11,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 /**
  * Created by tramchamploo on 2017/3/30.
  */
-public class TimeUsedComparison {
+public abstract class AbstractTimeUsedComparison {
 
   static String randomString() {
     return String.valueOf(ThreadLocalRandom.current().nextLong());
@@ -22,7 +21,7 @@ public class TimeUsedComparison {
     return System.getProperty(key, fallback);
   }
 
-  public static void main(String[] args) throws Exception {
+  protected void run() throws Exception {
     BatchJdbcTemplate batch;
     JdbcTemplate unbatch;
     SenderProxy proxy;
@@ -53,14 +52,7 @@ public class TimeUsedComparison {
       }
     });
 
-    AsyncReporter<Sql, Integer> reporter = AsyncReporter.builder(proxy)
-        .pendingMaxMessages(6000)
-        .bufferedMaxMessages(100)
-        .messageTimeout(50, TimeUnit.MILLISECONDS)
-        .pendingKeepalive(10, TimeUnit.MILLISECONDS)
-        .senderThreads(10)
-        .singleKey(true)
-        .build();
+    Reporter<Sql, Integer> reporter = getReporter(proxy);
     batch = new BatchJdbcTemplate(delegate, reporter);
     batch.setDataSource(dataSource);
 
@@ -82,8 +74,7 @@ public class TimeUsedComparison {
     }
     countDown.await();
     long used = System.nanoTime() - start;
-    System.out.println("batch time used: " + used);
-    reporter.sender.close();
+    System.out.println("batch time used:   " + used);
     reporter.close();
 
     unbatch.update(DROP_TABLE);
@@ -99,4 +90,6 @@ public class TimeUsedComparison {
     System.out.println("unbatch time used: " + used);
     unbatch.update(DROP_TABLE);
   }
+
+  protected abstract Reporter<Sql, Integer> getReporter(Sender<Sql, Integer> actual);
 }

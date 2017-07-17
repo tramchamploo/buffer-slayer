@@ -11,7 +11,7 @@ import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Created by tramchamploo on 2017/2/27.
+ * Sender that delegates spring's {@link JdbcTemplate} to execute sqls.
  */
 final class JdbcTemplateSender implements Sender<Sql, Integer> {
 

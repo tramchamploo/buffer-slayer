@@ -11,9 +11,9 @@ import org.springframework.jdbc.core.PreparedStatementSetter;
 
 /**
  * Created by tramchamploo on 2017/2/27.
- * Represent sql to be buffered
+ * Represent sql to be sent
  */
-final class Sql extends Message {
+public final class Sql extends Message {
 
   final String sql;
   transient final PreparedStatementSetter statementSetter;

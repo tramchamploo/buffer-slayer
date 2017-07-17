@@ -29,7 +29,7 @@ import org.springframework.jdbc.support.nativejdbc.NativeJdbcExtractor;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
 
 /**
- * Created by tramchamploo on 2017/3/3.
+ * JdbcTemplate that transforms normal updates to batched ones.
  */
 public class BatchJdbcTemplate {
 
@@ -42,38 +42,13 @@ public class BatchJdbcTemplate {
     this.reporter = reporter;
   }
 
-  public BatchJdbcTemplate() {
-    this.delegate = new JdbcTemplate();
-    this.reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate)).build();
-  }
-
-  public BatchJdbcTemplate(DataSource dataSource) {
-    this.delegate = new JdbcTemplate(dataSource);
-    this.reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate)).build();
-  }
-
-  public BatchJdbcTemplate(DataSource dataSource, boolean lazyInit) {
-    this.delegate = new JdbcTemplate(dataSource, lazyInit);
-    this.reporter = AsyncReporter.builder(new JdbcTemplateSender(delegate)).build();
-  }
-
-  public BatchJdbcTemplate(ReporterProperties<Sql, Integer> properties) {
-    this.delegate = new JdbcTemplate();
+  @SuppressWarnings("unchecked")
+  public BatchJdbcTemplate(JdbcTemplate delegate, ReporterProperties properties) {
+    this.delegate = delegate;
     this.reporter = properties.setSender(new JdbcTemplateSender(delegate)).toBuilder().build();
   }
 
-  public BatchJdbcTemplate(DataSource dataSource, ReporterProperties<Sql, Integer> properties) {
-    this.delegate = new JdbcTemplate(dataSource);
-    this.reporter = properties.setSender(new JdbcTemplateSender(delegate)).toBuilder().build();
-  }
-
-  public BatchJdbcTemplate(DataSource dataSource, boolean lazyInit, ReporterProperties<Sql, Integer> properties) {
-    this.delegate = new JdbcTemplate(dataSource, lazyInit);
-    this.reporter = properties.setSender(new JdbcTemplateSender(delegate)).toBuilder().build();
-  }
-
-  public void setNativeJdbcExtractor(
-      NativeJdbcExtractor extractor) {
+  public void setNativeJdbcExtractor(NativeJdbcExtractor extractor) {
     delegate.setNativeJdbcExtractor(extractor);
   }
 
