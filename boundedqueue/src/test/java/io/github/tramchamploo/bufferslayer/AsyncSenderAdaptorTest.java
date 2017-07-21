@@ -17,16 +17,16 @@ import org.junit.Test;
 /**
  * Created by tramchamploo on 2017/5/18.
  */
-public class SenderToAsyncSenderAdaptorTest {
+public class AsyncSenderAdaptorTest {
 
-  private SenderToAsyncSenderAdaptor<TestMessage, Integer> adaptor;
+  private AsyncSenderAdaptor<TestMessage, Integer> adaptor;
 
   @Test
   public void sendingSuccess() throws InterruptedException {
     FakeSender sender = new FakeSender();
     CountDownLatch countDown = new CountDownLatch(1);
 
-    adaptor = new SenderToAsyncSenderAdaptor<>(sender, 1, 1);
+    adaptor = new AsyncSenderAdaptor<>(sender, 1, 1);
     Promise<List<Integer>, MessageDroppedException, ?> promise = adaptor
         .send(Arrays.asList(newMessage(0), newMessage(1), newMessage(2)));
     promise.done(d -> {
@@ -45,7 +45,7 @@ public class SenderToAsyncSenderAdaptorTest {
     });
     CountDownLatch countDown = new CountDownLatch(1);
 
-    adaptor = new SenderToAsyncSenderAdaptor<>(sender, 1, 1);
+    adaptor = new AsyncSenderAdaptor<>(sender, 1, 1);
     Promise<List<Integer>, MessageDroppedException, ?> promise = adaptor
         .send(Arrays.asList(newMessage(0), newMessage(1), newMessage(2)));
     promise.fail(t -> {
@@ -70,7 +70,7 @@ public class SenderToAsyncSenderAdaptorTest {
       }
     });
 
-    adaptor = new SenderToAsyncSenderAdaptor<>(sender, 0, 1);
+    adaptor = new AsyncSenderAdaptor<>(sender, 0, 1);
     // block sender thread
     adaptor.send(singletonList(newMessage(0))).done(d -> {
       assertEquals("AsyncReporter-0-sender-0", Thread.currentThread().getName());
@@ -99,11 +99,11 @@ public class SenderToAsyncSenderAdaptorTest {
 
     CountDownLatch countDown = new CountDownLatch(1);
 
-    adaptor = new SenderToAsyncSenderAdaptor<>(sender, 0, 2);
+    adaptor = new AsyncSenderAdaptor<>(sender, 0, 2);
     adaptor.send(singletonList(newMessage(0))).then(i -> {
       senderId.incrementAndGet();
       adaptor.send(singletonList(newMessage(0))).then(j -> {
-        adaptor = new SenderToAsyncSenderAdaptor<>(sender, 1, 1);
+        adaptor = new AsyncSenderAdaptor<>(sender, 1, 1);
         reporterId.set(1);
         senderId.set(0);
         adaptor.send(singletonList(newMessage(0))).then(k -> {

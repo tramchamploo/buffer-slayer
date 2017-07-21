@@ -103,7 +103,7 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
     }
 
     @Override
-    public Reporter<M, R> build() {
+    public RxReporter<M, R> build() {
       return new RxReporter<>(this);
     }
   }

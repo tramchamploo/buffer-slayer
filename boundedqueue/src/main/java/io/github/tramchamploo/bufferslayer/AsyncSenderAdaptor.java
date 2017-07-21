@@ -22,13 +22,14 @@ import org.slf4j.LoggerFactory;
 /**
  * Created by tramchamploo on 2017/4/14.
  */
-final class SenderToAsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M, R> {
+final class AsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M, R> {
+
+  static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
 
   final Sender<M, R> delegate;
   final Executor executor;
-  static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
 
-  SenderToAsyncSenderAdaptor(Sender<M, R> delegate, long reporterId, int senderThreads) {
+  AsyncSenderAdaptor(Sender<M, R> delegate, long reporterId, int senderThreads) {
     this.delegate = checkNotNull(delegate);
     checkArgument(senderThreads > 0, "senderThreads > 0: %s", senderThreads);
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
