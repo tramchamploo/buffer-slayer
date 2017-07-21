@@ -19,7 +19,7 @@ public class FiberSenderAdaptorTest {
     FakeSender sender = new FakeSender();
     CountDownLatch countDown = new CountDownLatch(1);
 
-    adaptor = new FiberSenderAdaptor<>(sender);
+    adaptor = new FiberSenderAdaptor<>(sender, 1, 1);
     Promise<List<Integer>, MessageDroppedException, ?> promise =
         adaptor.send(Arrays.asList(newMessage(0), newMessage(1), newMessage(2)));
     promise.done(d -> {
@@ -38,7 +38,7 @@ public class FiberSenderAdaptorTest {
     });
     CountDownLatch countDown = new CountDownLatch(1);
 
-    adaptor = new FiberSenderAdaptor<>(sender);
+    adaptor = new FiberSenderAdaptor<>(sender, 1, 1);
     Promise<List<Integer>, MessageDroppedException, ?> promise =
         adaptor.send(Arrays.asList(newMessage(0), newMessage(1), newMessage(2)));
     promise.fail(t -> {
