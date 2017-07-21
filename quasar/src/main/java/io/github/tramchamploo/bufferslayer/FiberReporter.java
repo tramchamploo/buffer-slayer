@@ -3,17 +3,11 @@ package io.github.tramchamploo.bufferslayer;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import co.paralleluniverse.concurrent.util.ScheduledSingleThreadExecutor;
-import co.paralleluniverse.fibers.Fiber;
-import co.paralleluniverse.fibers.SuspendExecution;
-import co.paralleluniverse.fibers.futures.AsyncCompletionStage;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import org.jdeferred.Promise;
 
 public class FiberReporter<M extends Message, R> extends AsyncReporter<M, R> {
 
@@ -26,7 +20,7 @@ public class FiberReporter<M extends Message, R> extends AsyncReporter<M, R> {
   }
 
   AsyncSender<M, R> toAsyncSender(AsyncReporter.Builder<M, R> builder) {
-    return new FiberSenderAdaptor<>(builder.sender);
+    return new FiberSenderAdaptor<>(builder.sender, id, builder.senderThreads);
   }
 
   protected ScheduledExecutorService scheduler() {
@@ -55,6 +49,7 @@ public class FiberReporter<M extends Message, R> extends AsyncReporter<M, R> {
 
   public static final class Builder<M extends Message, R> extends Reporter.Builder<Builder<M, R>, M, R> {
 
+    int senderThreads = 1;
     int flushThreads = 1;
     int timerThreads = 1;
     long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
@@ -62,6 +57,12 @@ public class FiberReporter<M extends Message, R> extends AsyncReporter<M, R> {
 
     Builder(Sender<M, R> sender) {
       super(sender);
+    }
+
+    public Builder<M, R> senderThreads(int senderThreads) {
+      checkArgument(senderThreads > 0, "senderThreads > 0: %s", senderThreads);
+      this.senderThreads = senderThreads;
+      return this;
     }
 
     public Builder<M, R> flushThreads(int flushThreads) {

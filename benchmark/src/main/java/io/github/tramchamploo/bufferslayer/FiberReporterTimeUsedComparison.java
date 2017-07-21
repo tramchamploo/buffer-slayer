@@ -10,10 +10,13 @@ public class FiberReporterTimeUsedComparison extends AbstractTimeUsedComparison 
 
   @Override
   protected Reporter<Sql, Integer> getReporter(Sender<Sql, Integer> actual) {
-    return FiberReporter.builder(actual)
+    return FiberReporter.fiberBuilder(actual)
         .pendingMaxMessages(6000)
         .bufferedMaxMessages(100)
         .messageTimeout(50, TimeUnit.MILLISECONDS)
+        .pendingKeepalive(10, TimeUnit.MILLISECONDS)
+        .senderThreads(10)
+        .singleKey(true)
         .build();
   }
 }

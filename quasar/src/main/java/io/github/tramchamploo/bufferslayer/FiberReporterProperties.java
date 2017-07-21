@@ -5,10 +5,20 @@ import java.util.concurrent.TimeUnit;
 
 public class FiberReporterProperties extends AbstractReporterProperties<FiberReporterProperties> {
 
+  private int senderThreads = 1;
   private long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
   private int flushThreads = 1;
   private int timerThreads = 1;
   private boolean singleKey = false;
+
+  public int getSenderThreads() {
+    return senderThreads;
+  }
+
+  public FiberReporterProperties setSenderThreads(int senderThreads) {
+    this.senderThreads = senderThreads;
+    return self();
+  }
 
   public long getPendingKeepaliveNanos() {
     return pendingKeepaliveNanos;
@@ -50,6 +60,7 @@ public class FiberReporterProperties extends AbstractReporterProperties<FiberRep
     Builder builder = new Builder<>(sender)
         .messageTimeout(messageTimeoutNanos, TimeUnit.NANOSECONDS)
         .pendingKeepalive(pendingKeepaliveNanos, TimeUnit.NANOSECONDS)
+        .senderThreads(senderThreads)
         .flushThreads(flushThreads)
         .timerThreads(timerThreads)
         .bufferedMaxMessages(bufferedMaxMessages)
