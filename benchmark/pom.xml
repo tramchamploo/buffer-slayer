@@ -26,6 +26,11 @@
 
     <dependency>
       <groupId>${project.groupId}</groupId>
+      <artifactId>bufferslayer-quasar</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>${project.groupId}</groupId>
       <artifactId>bufferslayer-core</artifactId>
       <type>test-jar</type>
     </dependency>

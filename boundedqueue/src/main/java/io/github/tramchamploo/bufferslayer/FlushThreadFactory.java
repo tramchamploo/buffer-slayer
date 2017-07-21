@@ -5,7 +5,7 @@ import java.util.concurrent.ThreadFactory;
 import org.slf4j.Logger;
 
 /**
- * Created by tramchamploo on 2017/5/18.
+ * Produce threads that flush messages when buffer is full
  */
 class FlushThreadFactory {
 
@@ -19,7 +19,7 @@ class FlushThreadFactory {
     this.reporter = reporter;
     this.synchronizer = reporter.synchronizer;
     this.factory = new ThreadFactoryBuilder()
-        .setNameFormat("AsyncReporter-" + reporter.id + "-flusher-%d")
+        .setNameFormat(reporter.getClass().getSimpleName() + "-" + reporter.id + "-flusher-%d")
         .setDaemon(true)
         .build();
   }

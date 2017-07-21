@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
- * Created by tramchamploo on 2017/3/29.
+ * Delegate sending and trigger onMessages afterwards
  */
 public class SenderProxy implements Sender<Sql, Integer> {
 

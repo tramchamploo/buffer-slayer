@@ -8,7 +8,6 @@ import static java.util.Collections.singletonList;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
-import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
 import io.github.tramchamploo.bufferslayer.QueueManager.Callback;
 import java.io.Flushable;
 import java.util.Collection;
@@ -46,6 +45,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   final int bufferedMaxMessages;
   final boolean singleKey;
   final int flushThreads;
+  final int timerThreads;
   final FlushThreadFactory flushThreadFactory;
   final CopyOnWriteArraySet<Thread> flushers = new CopyOnWriteArraySet<>();
   final FlushSynchronizer synchronizer = new FlushSynchronizer();
@@ -56,26 +56,20 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   ScheduledExecutorService scheduler;
   BufferPool bufferPool;
 
-  private AsyncReporter(Builder<M, R> builder) {
-    this.sender = new SenderToAsyncSenderAdaptor<>(builder.sender, id, builder.senderThreads);
+  AsyncReporter(Builder<M, R> builder) {
+    this.sender = toAsyncSender(builder);
     this.metrics = builder.metrics;
     this.messageTimeoutNanos = builder.messageTimeoutNanos;
     this.bufferedMaxMessages = builder.bufferedMaxMessages;
     this.singleKey = builder.singleKey;
     this.flushThreads = builder.flushThreads;
+    this.timerThreads = builder.timerThreads;
     this.queueManager = new QueueManager(builder.pendingMaxMessages,
                                          builder.overflowStrategy,
                                          builder.pendingKeepaliveNanos);
     this.flushThreadFactory = new FlushThreadFactory(this);
     this.bufferPool = new BufferPool(MAX_BUFFER_POOL_ENTRIES, builder.bufferedMaxMessages, builder.singleKey);
     if (messageTimeoutNanos > 0) {
-      ThreadFactory timerFactory = new ThreadFactoryBuilder()
-                                      .setNameFormat("AsyncReporter-" + id + "-timer-%d")
-                                      .setDaemon(true)
-                                      .build();
-      ScheduledThreadPoolExecutor timerPool = new ScheduledThreadPoolExecutor(builder.timerThreads, timerFactory);
-      timerPool.setRemoveOnCancelPolicy(true);
-      this.scheduler = timerPool;
       this.queueManager.onCreate(new Callback() {
         @Override
         public void call(SizeBoundedQueue queue) {
@@ -83,6 +77,10 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
         }
       });
     }
+  }
+
+  AsyncSender<M, R> toAsyncSender(Builder<M, R> builder) {
+    return new AsyncSenderAdaptor<>(builder.sender, id, builder.senderThreads);
   }
 
   public static <M extends Message, R> Builder<M, R> builder(Sender<M, R> sender) {
@@ -143,6 +141,20 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
 
   @Override
   protected ScheduledExecutorService scheduler() {
+    if (this.scheduler == null) {
+      synchronized (this) {
+        if (this.scheduler == null) {
+          ThreadFactory timerFactory = new ThreadFactoryBuilder()
+              .setNameFormat("AsyncReporter-" + id + "-timer-%d")
+              .setDaemon(true)
+              .build();
+          ScheduledThreadPoolExecutor timerPool = new ScheduledThreadPoolExecutor(timerThreads, timerFactory);
+          timerPool.setRemoveOnCancelPolicy(true);
+          this.scheduler = timerPool;
+          return timerPool;
+        }
+      }
+    }
     return scheduler;
   }
 

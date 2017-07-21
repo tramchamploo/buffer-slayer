@@ -25,9 +25,6 @@ import org.springframework.jdbc.core.PreparedStatementCreatorFactory;
 import org.springframework.jdbc.core.SqlParameter;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
-/**
- * Created by tramchamploo on 2017/3/29.
- */
 public class BatchJdbcTemplateTest {
 
   @Rule
