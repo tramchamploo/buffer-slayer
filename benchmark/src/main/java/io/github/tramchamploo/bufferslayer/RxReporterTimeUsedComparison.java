@@ -9,7 +9,7 @@ public class RxReporterTimeUsedComparison extends AbstractTimeUsedComparison {
   }
 
   @Override
-  protected Reporter<Sql, Integer> getReporter(Sender<Sql, Integer> actual) {
+  protected Reporter<Sql, Integer> reporter(Sender<Sql, Integer> actual) {
     return RxReporter.builder(actual)
         .pendingMaxMessages(6000)
         .bufferedMaxMessages(100)

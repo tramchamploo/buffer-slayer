@@ -15,26 +15,23 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 @Measurement(iterations = 5, time = 1)
-@Warmup(iterations = 10, time = 1)
+@Warmup(iterations = 3, time = 1)
 @Fork(3)
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @State(Scope.Group)
-@SuppressWarnings("unchecked")
-public class RxReporterBenchmark extends AbstractReporterBenchmark {
+public class FiberBatchJdbcTemplateBenchmark extends AbstractBatchJdbcTemplateBenchmark {
 
-  @Override
-  protected Reporter getReporter() {
-    return RxReporter.builder(sender)
-        .pendingMaxMessages(1000000)
-        .metrics(metrics)
-        .messageTimeout(1000, TimeUnit.NANOSECONDS)
+  protected Reporter<Sql, Integer> reporter(Sender<Sql, Integer> sender) {
+    return FiberReporter.fiberBuilder(sender)
+        .pendingKeepalive(1, TimeUnit.SECONDS)
+        .senderThreads(10)
         .build();
   }
 
   public static void main(String[] args) throws RunnerException {
     Options opt = new OptionsBuilder()
-        .include(".*" + RxReporterBenchmark.class.getSimpleName() + ".*")
+        .include(".*" + FiberBatchJdbcTemplateBenchmark.class.getSimpleName() + ".*")
         .build();
 
     new Runner(opt).run();

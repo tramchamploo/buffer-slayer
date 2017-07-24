@@ -52,7 +52,7 @@ public abstract class AbstractTimeUsedComparison {
       }
     });
 
-    Reporter<Sql, Integer> reporter = getReporter(proxy);
+    Reporter<Sql, Integer> reporter = reporter(proxy);
     batch = new BatchJdbcTemplate(delegate, reporter);
     batch.setDataSource(dataSource);
 
@@ -91,5 +91,5 @@ public abstract class AbstractTimeUsedComparison {
     unbatch.update(DROP_TABLE);
   }
 
-  protected abstract Reporter<Sql, Integer> getReporter(Sender<Sql, Integer> actual);
+  protected abstract Reporter<Sql, Integer> reporter(Sender<Sql, Integer> actual);
 }

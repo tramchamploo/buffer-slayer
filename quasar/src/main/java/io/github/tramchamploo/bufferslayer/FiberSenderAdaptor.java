@@ -6,7 +6,6 @@ import static io.github.tramchamploo.bufferslayer.SenderFiberAsync.exec;
 
 import co.paralleluniverse.common.util.CheckedCallable;
 import co.paralleluniverse.fibers.Fiber;
-import co.paralleluniverse.fibers.SuspendExecution;
 import co.paralleluniverse.strands.SuspendableRunnable;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
@@ -41,7 +40,7 @@ final class FiberSenderAdaptor<M extends Message, R> implements AsyncSender<M, R
         .setNameFormat("FiberReporter-" + reporterId + "-sender-%d")
         .setDaemon(true)
         .build();
-    this.executor = new ThreadPoolExecutor(senderThreads,
+    this.executor = new ThreadPoolExecutor(0,
         senderThreads,
         0,
         TimeUnit.MILLISECONDS,
