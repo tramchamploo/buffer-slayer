@@ -24,18 +24,24 @@ import org.slf4j.LoggerFactory;
  */
 final class AsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M, R> {
 
-  static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
+  private static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
 
-  final Sender<M, R> delegate;
-  final Executor executor;
+  private final Sender<M, R> delegate;
+  private final Executor executor;
 
   AsyncSenderAdaptor(Sender<M, R> delegate, long reporterId, int senderThreads) {
     this.delegate = checkNotNull(delegate);
     checkArgument(senderThreads > 0, "senderThreads > 0: %s", senderThreads);
+
+    int priority = Math.max(Thread.MIN_PRIORITY, Math.min(Thread.MAX_PRIORITY,
+        Integer.getInteger(KEY_IO_PRIORITY, Thread.NORM_PRIORITY)));
+
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat("AsyncReporter-" + reporterId + "-sender-%d")
         .setDaemon(true)
+        .setPriority(priority)
         .build();
+
     this.executor = new ThreadPoolExecutor(0,
         senderThreads,
         0,
