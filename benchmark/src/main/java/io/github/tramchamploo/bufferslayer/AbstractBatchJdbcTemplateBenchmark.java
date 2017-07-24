@@ -7,41 +7,25 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.BenchmarkMode;
-import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Group;
 import org.openjdk.jmh.annotations.GroupThreads;
 import org.openjdk.jmh.annotations.Level;
-import org.openjdk.jmh.annotations.Measurement;
-import org.openjdk.jmh.annotations.Mode;
-import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
-import org.openjdk.jmh.annotations.Warmup;
-import org.openjdk.jmh.runner.Runner;
-import org.openjdk.jmh.runner.RunnerException;
-import org.openjdk.jmh.runner.options.Options;
-import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /**
- * Created by tramchamploo on 2017/3/16.
+ * Jdbc benchmark that simply doing inserts to a single table.
  */
-@Measurement(iterations = 5, time = 1)
-@Warmup(iterations = 3, time = 1)
-@Fork(3)
-@BenchmarkMode(Mode.Throughput)
-@OutputTimeUnit(TimeUnit.SECONDS)
-@State(Scope.Group)
-public class BatchJdbcTemplateBenchmark {
+public abstract class AbstractBatchJdbcTemplateBenchmark {
 
   private DriverManagerDataSource dataSource;
   private BatchJdbcTemplate batch;
   private JdbcTemplate unbatch;
-  private AsyncReporter<Sql, Integer> reporter;
+  private Reporter<Sql, Integer> reporter;
   private static SenderProxy proxy;
   private static AtomicLong counter = new AtomicLong();
 
@@ -54,6 +38,8 @@ public class BatchJdbcTemplateBenchmark {
   static String propertyOr(String key, String fallback) {
     return System.getProperty(key, fallback);
   }
+
+  protected abstract Reporter<Sql, Integer> reporter(Sender<Sql, Integer> sender);
 
   @Setup
   public void setup() throws PropertyVetoException {
@@ -69,10 +55,7 @@ public class BatchJdbcTemplateBenchmark {
     proxy = new SenderProxy(new JdbcTemplateSender(delegate));
     proxy.onMessages(updated -> counter.addAndGet(updated.size()));
 
-    reporter = AsyncReporter.builder(proxy)
-        .pendingKeepalive(1, TimeUnit.SECONDS)
-        .senderThreads(10)
-        .build();
+    reporter = reporter(proxy);
     batch = new BatchJdbcTemplate(delegate, reporter);
     batch.setDataSource(dataSource);
 
@@ -143,13 +126,5 @@ public class BatchJdbcTemplateBenchmark {
   @Benchmark @Group("high_contention_unbatched") @GroupThreads(8)
   public void high_contention_unbatched_insert(Lagging l) {
     unbatch.update(INSERTION, randomString(), new Date());
-  }
-
-  public static void main(String[] args) throws RunnerException {
-    Options opt = new OptionsBuilder()
-        .include(".*" + BatchJdbcTemplateBenchmark.class.getSimpleName() + ".*")
-        .build();
-
-    new Runner(opt).run();
   }
 }

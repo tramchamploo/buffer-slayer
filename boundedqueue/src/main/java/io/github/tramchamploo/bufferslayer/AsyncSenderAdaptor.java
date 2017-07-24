@@ -20,7 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Created by tramchamploo on 2017/4/14.
+ * Convert a synchronous sender to an async one by submitting tasks to an executor
  */
 final class AsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M, R> {
 
@@ -36,7 +36,7 @@ final class AsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M, R
         .setNameFormat("AsyncReporter-" + reporterId + "-sender-%d")
         .setDaemon(true)
         .build();
-    this.executor = new ThreadPoolExecutor(senderThreads,
+    this.executor = new ThreadPoolExecutor(0,
         senderThreads,
         0,
         TimeUnit.MILLISECONDS,

@@ -2,17 +2,14 @@ package io.github.tramchamploo.bufferslayer;
 
 import java.util.concurrent.TimeUnit;
 
-/**
- * Created by tramchamploo on 2017/3/30.
- */
-public class AsyncReporterTimeUsedComparison extends AbstractTimeUsedComparison {
+public class AsyncTimeUsedComparison extends AbstractTimeUsedComparison {
 
   public static void main(String[] args) throws Exception {
-    new AsyncReporterTimeUsedComparison().run();
+    new AsyncTimeUsedComparison().run();
   }
 
   @Override
-  protected Reporter<Sql, Integer> getReporter(Sender<Sql, Integer> actual) {
+  protected Reporter<Sql, Integer> reporter(Sender<Sql, Integer> actual) {
     return AsyncReporter.builder(actual)
         .pendingMaxMessages(6000)
         .bufferedMaxMessages(100)

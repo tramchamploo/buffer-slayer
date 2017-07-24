@@ -90,14 +90,15 @@ public class FiberReporter<M extends Message, R> extends AsyncReporter<M, R> {
 
     private AsyncReporter.Builder<M, R> asAsyncReporterBuilder() {
       return new AsyncReporter.Builder<>(sender)
+          .senderThreads(senderThreads)
           .timerThreads(timerThreads)
           .flushThreads(flushThreads)
-          .singleKey(singleKey)
           .bufferedMaxMessages(bufferedMaxMessages)
           .pendingKeepalive(pendingKeepaliveNanos, TimeUnit.NANOSECONDS)
           .pendingMaxMessages(pendingMaxMessages)
           .messageTimeout(messageTimeoutNanos, TimeUnit.NANOSECONDS)
           .metrics(metrics)
+          .singleKey(singleKey)
           .overflowStrategy(overflowStrategy);
     }
 

@@ -4,9 +4,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Created by tramchamploo on 2017/3/27.
- */
 public class NoopSender implements Sender {
 
   AtomicBoolean closed = new AtomicBoolean(false);

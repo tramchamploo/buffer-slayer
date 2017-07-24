@@ -2,14 +2,14 @@ package io.github.tramchamploo.bufferslayer;
 
 import java.util.concurrent.TimeUnit;
 
-public class FiberReporterTimeUsedComparison extends AbstractTimeUsedComparison {
+public class FiberTimeUsedComparison extends AbstractTimeUsedComparison {
 
   public static void main(String[] args) throws Exception {
-    new FiberReporterTimeUsedComparison().run();
+    new FiberTimeUsedComparison().run();
   }
 
   @Override
-  protected Reporter<Sql, Integer> getReporter(Sender<Sql, Integer> actual) {
+  protected Reporter<Sql, Integer> reporter(Sender<Sql, Integer> actual) {
     return FiberReporter.fiberBuilder(actual)
         .pendingMaxMessages(6000)
         .bufferedMaxMessages(100)
