@@ -28,18 +28,24 @@ import org.slf4j.LoggerFactory;
  */
 final class FiberSenderAdaptor<M extends Message, R> implements AsyncSender<M, R> {
 
-  static final Logger logger = LoggerFactory.getLogger(FiberSenderAdaptor.class);
+  private static final Logger logger = LoggerFactory.getLogger(FiberSenderAdaptor.class);
 
-  final Sender<M, R> delegate;
-  final ExecutorService executor;
+  private final Sender<M, R> delegate;
+  private final ExecutorService executor;
 
   FiberSenderAdaptor(Sender<M, R> delegate, long reporterId, int senderThreads) {
     this.delegate = checkNotNull(delegate);
     checkArgument(senderThreads > 0, "senderThreads > 0: %s", senderThreads);
+
+    int priority = Math.max(Thread.MIN_PRIORITY, Math.min(Thread.MAX_PRIORITY,
+        Integer.getInteger(KEY_IO_PRIORITY, Thread.NORM_PRIORITY)));
+
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat("FiberReporter-" + reporterId + "-sender-%d")
         .setDaemon(true)
+        .setPriority(priority)
         .build();
+
     this.executor = new ThreadPoolExecutor(0,
         senderThreads,
         0,
