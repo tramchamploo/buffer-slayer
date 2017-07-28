@@ -51,15 +51,6 @@ For **rx-java** implementation:
 </dependency>
 ```
 
-For **quasar** implementation:
-```xml
-<dependency>
-  <groupId>io.github.tramchamploo</groupId>
-  <artifactId>bufferslayer-quasar</artifactId>
-  <version>1.3.6</version>
-</dependency>
-```
-
 ```java
 AsyncReporterProperties reporterProperties = new AsyncReporterProperties()
         .setFlushThreads(5)
