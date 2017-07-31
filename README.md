@@ -3,7 +3,7 @@
 [ ![Download](https://api.bintray.com/packages/tramchamploo/tramchamploo/buffer-slayer/images/download.svg) ](https://bintray.com/tramchamploo/tramchamploo/buffer-slayer/_latestVersion)
 
 # buffer-slayer
-buffer-slayer is tool that buffers requests and send them in batch, of which client supports batch operation. Such as `Spring-JdbcTemplate`(batchUpdate), `Redis`(pipeline).
+buffer-slayer is tool that buffers requests and send them in batch, of which client supports batch operation. Such as `spring-jdbc`(batchUpdate), `jedis`(pipeline), `vertx-mysql-postgresql-client`(batch, batchWithParams).
 
 It has a queue that allows multiple producers to send to, and limited so to keep application away from Overflowing. 
 
@@ -88,16 +88,16 @@ This is where you configure all properties.
 ## Benchmark
 Here is a simple jdbc benchmark result on my MacBook Pro (Retina, 13-inch, Late 2013).
 
-Using mysql 5.7.18, keeps executing a simple `INSERT INTO test.benchmark(data, time) VALUES(?, ?);`
+Using mysql 5.7.18, keeps executing a simple `INSERT INTO test.benchmark(data, time) VALUES(?, ?);`. With `rewriteBatchedStatements=true`
 
 ```
-Benchmark                                                    Mode  Cnt       Score  Units
-BatchJdbcTemplateBenchmark.high_contention_batched          thrpt   15   27917.086  ops/s
-BatchJdbcTemplateBenchmark.high_contention_unbatched        thrpt   15     316.562  ops/s
-BatchJdbcTemplateBenchmark.mild_contention_batched          thrpt   15   18672.057  ops/s
-BatchJdbcTemplateBenchmark.mild_contention_unbatched        thrpt   15     280.970  ops/s
-BatchJdbcTemplateBenchmark.no_contention_batched            thrpt   15    9053.288  ops/s
-BatchJdbcTemplateBenchmark.no_contention_unbatched          thrpt   15     198.581  ops/s
+Benchmark                                                         Mode  Cnt       Score  Units
+AsyncBatchJdbcTemplateBenchmark.high_contention_batched          thrpt   15  223123.122  ops/s
+AsyncBatchJdbcTemplateBenchmark.high_contention_unbatched        thrpt   15     308.868  ops/s
+AsyncBatchJdbcTemplateBenchmark.mild_contention_batched          thrpt   15   60781.806  ops/s
+AsyncBatchJdbcTemplateBenchmark.mild_contention_unbatched        thrpt   15     283.915  ops/s
+AsyncBatchJdbcTemplateBenchmark.no_contention_batched            thrpt   15   29199.430  ops/s
+AsyncBatchJdbcTemplateBenchmark.no_contention_unbatched          thrpt   15     177.196  ops/s
 ```
 
 ## Components

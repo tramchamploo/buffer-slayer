@@ -20,15 +20,15 @@ import org.slf4j.LoggerFactory;
 /**
  * Convert a synchronous sender to an async one by submitting tasks to an executor
  */
-final class AsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M> {
+final class AsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M, R> {
 
-  private static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
+  private static final Logger logger = LoggerFactory.getLogger(AsyncSenderAdaptor.class);
   static SenderExecutorHolder executorHolder;
 
-  private final Sender<M, R> delegate;
+  private final SyncSender<M, R> delegate;
   private final Executor executor;
 
-  AsyncSenderAdaptor(Sender<M, R> delegate, int sharedSenderThreads) {
+  AsyncSenderAdaptor(SyncSender<M, R> delegate, int sharedSenderThreads) {
     this.delegate = checkNotNull(delegate);
     checkArgument(sharedSenderThreads > 0, "sharedSenderThreads > 0: %s", sharedSenderThreads);
     synchronized (AsyncSenderAdaptor.class) {
@@ -40,11 +40,12 @@ final class AsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M> {
   }
 
   @Override
-  @SuppressWarnings("unchecked")
   public Promise<MultipleResults, OneReject, MasterProgress> send(final List<SendingTask<M>> tasks) {
     logger.debug("Sending {} messages.", tasks.size());
     Object[] messageAndDeferred = SendingTask.unzipGeneric(tasks);
+    @SuppressWarnings("unchecked")
     final List<M> messages = (List<M>) messageAndDeferred[0];
+    @SuppressWarnings("unchecked")
     final List<Deferred> deferreds = (List<Deferred>) messageAndDeferred[1];
     executor.execute(new Runnable() {
       @Override

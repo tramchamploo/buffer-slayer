@@ -1,22 +1,19 @@
 package io.github.tramchamploo.bufferslayer;
 
+import static io.github.tramchamploo.bufferslayer.TestUtil.propertyOr;
+import static io.github.tramchamploo.bufferslayer.TestUtil.randomString;
+
 import java.util.Date;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
+/**
+ * Compare time used for batched and non batched sql updates.
+ */
 public abstract class AbstractTimeUsedComparison {
-
-  static String randomString() {
-    return String.valueOf(ThreadLocalRandom.current().nextLong());
-  }
-
-  static String propertyOr(String key, String fallback) {
-    return System.getProperty(key, fallback);
-  }
 
   protected void run() throws Exception {
     BatchJdbcTemplate batch;
@@ -25,7 +22,7 @@ public abstract class AbstractTimeUsedComparison {
 
     DriverManagerDataSource dataSource = new DriverManagerDataSource();
     dataSource.setDriverClassName("com.mysql.jdbc.Driver");
-    dataSource.setUrl(propertyOr("jdbcUrl", "jdbc:mysql://127.0.0.1:3306?useSSL=false"));
+    dataSource.setUrl(propertyOr("jdbcUrl", "jdbc:mysql://127.0.0.1:3306?useSSL=false&rewriteBatchedStatements=true"));
     dataSource.setUsername(propertyOr("username", "root"));
     dataSource.setPassword(propertyOr("password", "root"));
 
@@ -49,7 +46,7 @@ public abstract class AbstractTimeUsedComparison {
       }
     });
 
-    Reporter<Sql, Integer> reporter = reporter(proxy);
+    Reporter<SQL, Integer> reporter = reporter(proxy);
     batch = new BatchJdbcTemplate(delegate, reporter);
     batch.setDataSource(dataSource);
 
@@ -88,5 +85,5 @@ public abstract class AbstractTimeUsedComparison {
     unbatch.update(DROP_TABLE);
   }
 
-  protected abstract Reporter<Sql, Integer> reporter(Sender<Sql, Integer> actual);
+  protected abstract <S extends Message, R> Reporter<S, R> reporter(Sender<S, R> actual);
 }

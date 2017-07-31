@@ -9,14 +9,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Created by tramchamploo on 2017/3/16.
+ * Log metrics every 5 seconds by default
  */
 public class LogReporterMetricsExporter extends ReporterMetricsExporter {
 
   private static final Logger logger = LoggerFactory.getLogger(LogReporterMetricsExporter.class);
   private ScheduledExecutorService executor;
 
-  static final int DELAY = propertyOr("bufferslayer.metrics.log.delayInSeconds", 5);
+  private static final int DELAY = propertyOr("bufferslayer.metrics.log.delayInSeconds", 5);
 
   @Override
   public void start(final ReporterMetrics metrics) {

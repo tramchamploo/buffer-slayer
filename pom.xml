@@ -22,6 +22,7 @@
     <module>jdbc</module>
     <module>benchmark</module>
     <module>rx</module>
+    <module>vertx-jdbc</module>
   </modules>
 
   <properties>
@@ -113,6 +114,19 @@
         <groupId>${project.groupId}</groupId>
         <artifactId>bufferslayer-rx</artifactId>
         <version>${project.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>bufferslayer-vertx-jdbc</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>bufferslayer-vertx-jdbc</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
       </dependency>
 
       <dependency>

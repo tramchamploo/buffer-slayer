@@ -1,10 +1,9 @@
 package io.github.tramchamploo.bufferslayer;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class NoopSender<M extends Message> implements Sender<M, M> {
+public class NoopSender<M extends Message> implements SyncSender<M, M> {
 
   private AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -22,7 +21,7 @@ public class NoopSender<M extends Message> implements Sender<M, M> {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     closed.set(true);
   }
 }

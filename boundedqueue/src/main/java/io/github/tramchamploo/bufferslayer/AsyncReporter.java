@@ -38,7 +38,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
 
   static AtomicLong idGenerator = new AtomicLong();
   final Long id = idGenerator.getAndIncrement();
-  final AsyncSender<M> sender;
+  final AsyncSender<M, R> sender;
   final ReporterMetrics metrics;
   final long messageTimeoutNanos;
   final int bufferedMaxMessages;
@@ -80,8 +80,13 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     }
   }
 
-  AsyncSender<M> toAsyncSender(Builder<M, R> builder) {
-    return new AsyncSenderAdaptor<>(builder.sender, builder.sharedSenderThreads);
+  AsyncSender<M, R> toAsyncSender(Builder<M, R> builder) {
+    Sender<M, R> sender = builder.sender;
+    if (sender instanceof AsyncSender) {
+      return (AsyncSender<M, R>) sender;
+    } else {
+      return new AsyncSenderAdaptor<>((SyncSender<M, R>)sender, builder.sharedSenderThreads);
+    }
   }
 
   public static <M extends Message, R> Builder<M, R> builder(Sender<M, R> sender) {
