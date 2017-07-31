@@ -10,21 +10,18 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import org.junit.Test;
 
-/**
- * Created by tramchamploo on 2017/5/31.
- */
-public class SqlTest {
+public class SQLTest {
 
   @Test
   public void sqlKeyToString() {
-    Sql sql = Sql.builder()
+    SQL sql = SQL.builder()
         .sql("insert into prepared values(?, ?)")
         .args(new Object[]{0, 1})
         .build();
     assertEquals("SqlKey(insert into prepared values(?, ?), true)",
         sql.asMessageKey().toString());
 
-    sql = Sql.builder()
+    sql = SQL.builder()
         .sql("insert into unprepared values(0, 1)")
         .build();
     assertEquals("SqlKey(insert into unprepared values(0, 1), false)",
@@ -33,11 +30,11 @@ public class SqlTest {
 
   @Test
   public void unpreparedStatementsShareTheSameKey() {
-    Sql sql = Sql.builder()
+    SQL sql = SQL.builder()
         .sql("insert into unprepared values(1, 1)")
         .build();
 
-    Sql sql2 = Sql.builder()
+    SQL sql2 = SQL.builder()
         .sql("insert into unprepared values(2, 2)")
         .build();
 
@@ -46,12 +43,12 @@ public class SqlTest {
 
   @Test
   public void samePreparedStatementsShareTheSameKey() {
-    Sql sql = Sql.builder()
+    SQL sql = SQL.builder()
         .sql("insert into prepared values(?, ?)")
         .args(new Object[]{1, 1})
         .build();
 
-    Sql sql2 = Sql.builder()
+    SQL sql2 = SQL.builder()
         .sql("insert into prepared values(?, ?)")
         .args(new Object[]{2, 2})
         .build();
@@ -61,12 +58,12 @@ public class SqlTest {
 
   @Test
   public void differentPreparedStatementsHaveDifferentKeys() {
-    Sql sql = Sql.builder()
+    SQL sql = SQL.builder()
         .sql("insert into one values(?, ?)")
         .args(new Object[]{1, 1})
         .build();
 
-    Sql sql2 = Sql.builder()
+    SQL sql2 = SQL.builder()
         .sql("insert into two values(?, ?)")
         .args(new Object[]{2, 2})
         .build();
@@ -78,7 +75,7 @@ public class SqlTest {
   public void deserialize() throws Exception {
     String sql = "to serialize";
     Object[] args = {"arg1", "arg2"};
-    Sql toSerialize = Sql.builder()
+    SQL toSerialize = SQL.builder()
         .sql(sql)
         .args(args)
         .build();
@@ -90,7 +87,7 @@ public class SqlTest {
     byte[] buf = bytes.toByteArray();
 
     ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(buf));
-    Sql deserialized = (Sql) ois.readObject();
+    SQL deserialized = (SQL) ois.readObject();
     assertEquals(sql, deserialized.sql);
     assertArrayEquals(args, deserialized.args);
   }

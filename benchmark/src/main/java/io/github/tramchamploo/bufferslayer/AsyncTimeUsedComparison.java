@@ -9,7 +9,7 @@ public class AsyncTimeUsedComparison extends AbstractTimeUsedComparison {
   }
 
   @Override
-  protected Reporter<Sql, Integer> reporter(Sender<Sql, Integer> actual) {
+  protected <S extends Message, R> Reporter<S, R> reporter(Sender<S, R> actual) {
     return AsyncReporter.builder(actual)
         .pendingMaxMessages(6000)
         .bufferedMaxMessages(100)

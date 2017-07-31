@@ -13,7 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * Sender that delegates spring's {@link JdbcTemplate} to execute sqls.
  */
-final class JdbcTemplateSender implements Sender<Sql, Integer> {
+final class JdbcTemplateSender implements SyncSender<SQL, Integer> {
 
   private final JdbcTemplate underlying;
 
@@ -36,11 +36,10 @@ final class JdbcTemplateSender implements Sender<Sql, Integer> {
   public void close() throws IOException {
   }
 
-  @Override
-  public List<Integer> send(List<Sql> sqls) {
-    Preconditions.checkArgument(sqls != null && sqls.size() > 0, "Sqls must not be empty.");
-    if (!ofTheSameSql(sqls)) {
-      throw new UnsupportedOperationException("Different sqls not supported");
+  public List<Integer> send(List<SQL> sqls) {
+    Preconditions.checkArgument(sqls != null && sqls.size() > 0, "SQLs should not be empty.");
+    if (!sameSQL(sqls)) {
+      throw new UnsupportedOperationException("Different sqls are not supported");
     }
 
     boolean prepared = allPreparedStatement(sqls);
@@ -48,7 +47,7 @@ final class JdbcTemplateSender implements Sender<Sql, Integer> {
     if (prepared) {
       rowsAffected = underlying.batchUpdate(sqls.get(0).sql, batchPreparedStatementSetter(sqls));
     } else {
-      rowsAffected = underlying.batchUpdate(extractSqls(sqls).toArray(new String[0]));
+      rowsAffected = underlying.batchUpdate(extractSQLs(sqls).toArray(new String[0]));
     }
 
     List<Integer> ret = new ArrayList<>(rowsAffected.length);
@@ -58,15 +57,15 @@ final class JdbcTemplateSender implements Sender<Sql, Integer> {
     return ret;
   }
 
-  private static List<String> extractSqls(List<Sql> sqls) {
+  private static List<String> extractSQLs(List<SQL> sqls) {
     ArrayList<String> ret = new ArrayList<>(sqls.size());
-    for (Sql s : sqls) {
+    for (SQL s : sqls) {
       ret.add(s.sql);
     }
     return ret;
   }
 
-  private static BatchPreparedStatementSetter batchPreparedStatementSetter(final List<Sql> sqls) {
+  private static BatchPreparedStatementSetter batchPreparedStatementSetter(final List<SQL> sqls) {
     return new BatchPreparedStatementSetter() {
       @Override
       public void setValues(PreparedStatement ps, int i) throws SQLException {
@@ -80,11 +79,11 @@ final class JdbcTemplateSender implements Sender<Sql, Integer> {
     };
   }
 
-  private static boolean ofTheSameSql(List<Sql> sqls) {
+  private static boolean sameSQL(List<SQL> sqls) {
     if (sqls.size() == 1) {
       return true;
     }
-    Iterator<Sql> iter = sqls.iterator();
+    Iterator<SQL> iter = sqls.iterator();
     String first = iter.next().sql;
     while (iter.hasNext()) {
       if (!first.equals(iter.next().sql)) {
@@ -94,11 +93,11 @@ final class JdbcTemplateSender implements Sender<Sql, Integer> {
     return true;
   }
 
-  private static boolean allPreparedStatement(List<Sql> sqls) {
+  private static boolean allPreparedStatement(List<SQL> sqls) {
     if (sqls.size() == 1) {
       return sqls.get(0).prepared();
     }
-    Iterator<Sql> iter = sqls.iterator();
+    Iterator<SQL> iter = sqls.iterator();
     boolean prepared = iter.next().prepared();
     while (iter.hasNext()) {
       if (prepared != (iter.next().prepared())) {

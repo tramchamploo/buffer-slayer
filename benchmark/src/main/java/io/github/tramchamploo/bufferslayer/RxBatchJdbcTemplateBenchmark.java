@@ -20,18 +20,15 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @State(Scope.Group)
-public class AsyncBatchJdbcTemplateBenchmark extends AbstractBatchJdbcTemplateBenchmark {
+public class RxBatchJdbcTemplateBenchmark extends AbstractBatchJdbcTemplateBenchmark {
 
   protected Reporter<SQL, Integer> reporter(Sender<SQL, Integer> sender) {
-    return AsyncReporter.builder(sender)
-        .pendingKeepalive(1, TimeUnit.SECONDS)
-        .sharedSenderThreads(10)
-        .build();
+    return RxReporter.builder(sender).build();
   }
 
   public static void main(String[] args) throws RunnerException {
     Options opt = new OptionsBuilder()
-        .include(".*" + AsyncBatchJdbcTemplateBenchmark.class.getSimpleName() + ".*")
+        .include(".*" + RxBatchJdbcTemplateBenchmark.class.getSimpleName() + ".*")
         .build();
 
     new Runner(opt).run();

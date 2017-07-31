@@ -7,13 +7,13 @@ import java.util.function.Consumer;
 /**
  * Delegate sending and trigger onMessages afterwards
  */
-public class SenderProxy implements Sender<Sql, Integer> {
+public class SenderProxy implements SyncSender<SQL, Integer> {
 
   private AtomicBoolean closed = new AtomicBoolean(false);
   private Consumer<List<Integer>> onMessages = messages -> { };
-  final Sender<Sql, Integer> delegate;
+  final SyncSender<SQL, Integer> delegate;
 
-  public SenderProxy(Sender<Sql, Integer> delegate) {
+  public SenderProxy(SyncSender<SQL, Integer> delegate) {
     this.delegate = delegate;
   }
 
@@ -28,7 +28,7 @@ public class SenderProxy implements Sender<Sql, Integer> {
   }
 
   @Override
-  public List<Integer> send(List<Sql> messages) {
+  public List<Integer> send(List<SQL> messages) {
     if (closed.get()) {
       throw new IllegalStateException("Closed!");
     }

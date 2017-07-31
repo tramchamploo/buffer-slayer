@@ -19,19 +19,28 @@ final class SenderConsumerBridge {
   static <M extends Message, R> Consumer<List<SendingTask<M>>> toConsumer(final Sender<M, R> sender) {
     return new Consumer<List<SendingTask<M>>>() {
       @Override
-      public void accept(List<SendingTask<M>> tasks) throws Exception {
-        if (tasks.isEmpty()) return;
+      public void accept(final List<SendingTask<M>> tasks) throws Exception {
+        if (tasks.isEmpty()) {
+          return;
+        }
         logger.debug("Sending {} messages.", tasks.size());
 
         Object[] messageAndDeferred = SendingTask.unzipGeneric(tasks);
         final List<M> messages = (List<M>) messageAndDeferred[0];
         final List<Deferred> deferreds = (List<Deferred>) messageAndDeferred[1];
 
-        try {
-          List<R> result = sender.send(messages);
-          Deferreds.resolveAll(result, deferreds);
-        } catch (Throwable t) {
-          Deferreds.rejectAll(MessageDroppedException.dropped(t, messages), deferreds, messages);
+        if (sender instanceof SyncSender) {
+          SyncSender<M, R> syncSender = (SyncSender<M, R>) sender;
+
+          try {
+            List<R> result = syncSender.send(messages);
+            Deferreds.resolveAll(result, deferreds);
+          } catch (Throwable t) {
+            Deferreds.rejectAll(MessageDroppedException.dropped(t, messages), deferreds, messages);
+          }
+        } else {
+          AsyncSender<M, R> asyncSender = (AsyncSender<M, R>) sender;
+          asyncSender.send(tasks);
         }
       }
     };
