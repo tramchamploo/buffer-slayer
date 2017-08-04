@@ -4,7 +4,7 @@ import io.github.tramchamploo.bufferslayer.internal.Component;
 import java.util.List;
 
 /**
- * Created by tramchamploo on 2017/2/27.
+ * Send that send batched messages
  * @param <M> Type of Message
  * @param <R> Type of return value
  */

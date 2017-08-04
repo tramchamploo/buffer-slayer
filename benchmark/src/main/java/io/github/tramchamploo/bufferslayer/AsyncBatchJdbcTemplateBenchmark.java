@@ -25,7 +25,7 @@ public class AsyncBatchJdbcTemplateBenchmark extends AbstractBatchJdbcTemplateBe
   protected Reporter<Sql, Integer> reporter(Sender<Sql, Integer> sender) {
     return AsyncReporter.builder(sender)
         .pendingKeepalive(1, TimeUnit.SECONDS)
-        .senderThreads(10)
+        .sharedSenderThreads(10)
         .build();
   }
 

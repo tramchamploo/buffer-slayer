@@ -6,9 +6,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-/**
- * Created by tramchamploo on 2017/3/14.
- */
 public class FakeSender implements Sender<TestMessage, Integer> {
 
   private AtomicBoolean closed = new AtomicBoolean(false);
@@ -34,8 +31,8 @@ public class FakeSender implements Sender<TestMessage, Integer> {
     if (closed.get()) {
       throw new IllegalStateException("Closed!");
     }
-    sent.addAll(messages);
     onMessages.accept(messages);
+    sent.addAll(messages);
     Integer[] ret = new Integer[messages.size()];
     for (int i = 0; i < messages.size(); i++) {
       ret[i] = messages.get(i).key;

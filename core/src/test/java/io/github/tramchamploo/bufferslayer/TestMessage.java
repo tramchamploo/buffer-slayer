@@ -1,8 +1,5 @@
 package io.github.tramchamploo.bufferslayer;
 
-/**
- * Created by tramchamploo on 2017/3/14.
- */
 public class TestMessage extends Message {
 
   final int key;

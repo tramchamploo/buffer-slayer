@@ -5,18 +5,18 @@ import java.util.concurrent.TimeUnit;
 
 public class AsyncReporterProperties extends AbstractReporterProperties<AsyncReporterProperties> {
 
-  private int senderThreads = 1;
+  private int sharedSenderThreads = 1;
   private long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
   private int flushThreads = 1;
   private int timerThreads = AsyncReporter.DEFAULT_TIMER_THREADS;
   private boolean singleKey = false;
 
-  public int getSenderThreads() {
-    return senderThreads;
+  public int getSharedSenderThreads() {
+    return sharedSenderThreads;
   }
 
-  public AsyncReporterProperties setSenderThreads(int senderThreads) {
-    this.senderThreads = senderThreads;
+  public AsyncReporterProperties setSharedSenderThreads(int sharedSenderThreads) {
+    this.sharedSenderThreads = sharedSenderThreads;
     return self();
   }
 
@@ -57,7 +57,7 @@ public class AsyncReporterProperties extends AbstractReporterProperties<AsyncRep
   }
 
   public Builder toBuilder() {
-    Builder builder = new Builder<>(sender).senderThreads(senderThreads)
+    Builder builder = new Builder<>(sender).sharedSenderThreads(sharedSenderThreads)
                                            .messageTimeout(messageTimeoutNanos, TimeUnit.NANOSECONDS)
                                            .pendingKeepalive(pendingKeepaliveNanos, TimeUnit.NANOSECONDS)
                                            .flushThreads(flushThreads)

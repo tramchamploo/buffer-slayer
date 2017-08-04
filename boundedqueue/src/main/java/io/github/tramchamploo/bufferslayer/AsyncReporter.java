@@ -80,7 +80,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   }
 
   AsyncSender<M, R> toAsyncSender(Builder<M, R> builder) {
-    return new AsyncSenderAdaptor<>(builder.sender, id, builder.senderThreads);
+    return new AsyncSenderAdaptor<>(builder.sender, builder.sharedSenderThreads);
   }
 
   public static <M extends Message, R> Builder<M, R> builder(Sender<M, R> sender) {
@@ -89,7 +89,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
 
   public static final class Builder<M extends Message, R> extends Reporter.Builder<Builder<M, R>, M, R> {
 
-    int senderThreads = 1;
+    int sharedSenderThreads = 1;
     int flushThreads = 1;
     int timerThreads = DEFAULT_TIMER_THREADS;
     long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
@@ -99,9 +99,9 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
       super(sender);
     }
 
-    public Builder<M, R> senderThreads(int senderThreads) {
-      checkArgument(senderThreads > 0, "senderThreads > 0: %s", senderThreads);
-      this.senderThreads = senderThreads;
+    public Builder<M, R> sharedSenderThreads(int senderThreads) {
+      checkArgument(senderThreads > 0, "sharedSenderThreads > 0: %s", senderThreads);
+      this.sharedSenderThreads = senderThreads;
       return this;
     }
 

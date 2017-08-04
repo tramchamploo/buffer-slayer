@@ -15,7 +15,7 @@ public class AsyncTimeUsedComparison extends AbstractTimeUsedComparison {
         .bufferedMaxMessages(100)
         .messageTimeout(50, TimeUnit.MILLISECONDS)
         .pendingKeepalive(10, TimeUnit.MILLISECONDS)
-        .senderThreads(10)
+        .sharedSenderThreads(10)
         .singleKey(true)
         .build();
   }
