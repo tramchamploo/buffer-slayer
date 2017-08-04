@@ -9,9 +9,6 @@ import org.jdeferred.Promise;
  */
 public interface AsyncSender<M extends Message, R> extends Component {
 
-  /** The name of the system property for setting the thread priority for this Scheduler. */
-  String KEY_IO_PRIORITY = "bufferslayer.io-priority";
-
   /**
    * asynchronously send messages
    *

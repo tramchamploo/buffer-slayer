@@ -73,7 +73,7 @@ promise.done(success -> ...)
 This is where you configure all properties.
 
 * `sender`: Sender that messages are flushed into. Necessary but often not needed for users to configure. Implementations like `JdbcTemplate` will configure it by itself.
-* `senderThreads`: Num of threads that sender execute in.
+* `sharedSenderThreads`: Num of threads that sender execute in.
 * `timerThreads`: Num of threads in scheduled executor, flushing messages at a fixed rate.
 * `flushThreads`: Num of threads that flush messages to sender. They wait until a buffer is full.
 * `metrics`: (inmemory, noop) metrics that records nums of sent, dropped, queued messages.

@@ -4,8 +4,7 @@ import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Created by tramchamploo on 2017/3/3.
- * Message can be send to reporter, could be a sql or a hbase query
+ * Message which can be sent to reporter, could be a sql statement
  */
 public abstract class Message implements Serializable {
 
