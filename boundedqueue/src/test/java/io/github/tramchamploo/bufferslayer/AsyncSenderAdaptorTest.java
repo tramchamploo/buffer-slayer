@@ -5,7 +5,10 @@ import static java.util.Collections.singletonList;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -13,11 +16,25 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.jdeferred.Promise;
+import org.junit.After;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class AsyncSenderAdaptorTest {
 
   private AsyncSenderAdaptor<TestMessage, Integer> adaptor;
+
+  @BeforeClass
+  public static void setup() {
+    if (AsyncSenderAdaptor.executorHolder != null) {
+      AsyncSenderAdaptor.executorHolder = null;
+    }
+  }
+
+  @After
+  public void tearDown() throws IOException {
+    adaptor.close();
+  }
 
   @Test
   public void sendingSuccess() throws InterruptedException {
@@ -31,7 +48,7 @@ public class AsyncSenderAdaptorTest {
       assertArrayEquals(new Integer[]{0, 1, 2}, d.toArray());
       countDown.countDown();
     });
-    countDown.await(500, TimeUnit.MILLISECONDS);
+    assertTrue(countDown.await(500, TimeUnit.MILLISECONDS));
   }
 
   @Test
@@ -50,7 +67,7 @@ public class AsyncSenderAdaptorTest {
       assertEquals(ex, t.getCause());
       countDown.countDown();
     });
-    countDown.await(500, TimeUnit.MILLISECONDS);
+    assertTrue(countDown.await(500, TimeUnit.MILLISECONDS));
   }
 
   @Test
@@ -71,7 +88,7 @@ public class AsyncSenderAdaptorTest {
     adaptor = new AsyncSenderAdaptor<>(sender, 1);
     // block sender thread
     adaptor.send(singletonList(newMessage(0))).done(d -> {
-      assertEquals("AsyncReporter-sender-0", Thread.currentThread().getName());
+      assertTrue(Thread.currentThread().getName().startsWith("AsyncReporter-sender-"));
       countDown.countDown();
     });
     // caller runs and reset barrier
@@ -80,26 +97,38 @@ public class AsyncSenderAdaptorTest {
       countDown.countDown();
     });
 
-    countDown.await(500, TimeUnit.MILLISECONDS);
+    assertTrue(countDown.await(500, TimeUnit.MILLISECONDS));
     assertEquals(0, barrier.getNumberWaiting());
   }
+
 
   @Test
   public void senderThreadName() throws InterruptedException {
     FakeSender sender = new FakeSender();
 
-    AtomicInteger senderId = new AtomicInteger(0);
-    sender.onMessages(messages -> {
-      String threadName = Thread.currentThread().getName();
-      assertEquals("AsyncReporter-sender-" + senderId.get(), threadName);
-    });
+    sender.onMessages(messages ->
+        assertTrue(Thread.currentThread().getName().startsWith("AsyncReporter-sender-")));
 
     CountDownLatch countDown = new CountDownLatch(1);
 
     adaptor = new AsyncSenderAdaptor<>(sender, 1);
-    adaptor.send(singletonList(newMessage(0))).then(i -> {
-      countDown.countDown();
-    });
-    countDown.await(500, TimeUnit.MILLISECONDS);
+    adaptor.send(singletonList(newMessage(0))).done(i -> countDown.countDown());
+    assertTrue(countDown.await(500, TimeUnit.MILLISECONDS));
+  }
+
+  @Test
+  public void refCount() throws IOException {
+    FakeSender sender = new FakeSender();
+    adaptor = new AsyncSenderAdaptor<>(sender, 1);
+    assertEquals(1, AsyncSenderAdaptor.executorHolder.refCount());
+
+    AsyncSenderAdaptor adaptor2 = new AsyncSenderAdaptor<>(sender, 1);
+    assertEquals(2, AsyncSenderAdaptor.executorHolder.refCount());
+
+    adaptor2.close();
+    assertEquals(1, AsyncSenderAdaptor.executorHolder.refCount());
+
+    adaptor.close();
+    assertNull(AsyncSenderAdaptor.executorHolder);
   }
 }

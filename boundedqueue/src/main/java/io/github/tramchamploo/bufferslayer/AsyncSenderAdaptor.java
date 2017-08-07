@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
 final class AsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M, R> {
 
   private static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
-  private static SenderExecutorHolder executorHolder;
+  static SenderExecutorHolder executorHolder;
 
   private final Sender<M, R> delegate;
   private final Executor executor;
@@ -65,8 +65,10 @@ final class AsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M, R
 
   @Override
   public void close() throws IOException {
-    if (executor instanceof ExecutorService) {
-      ((ExecutorService) executor).shutdown();
+    synchronized (AsyncSenderAdaptor.class) {
+      if (executorHolder != null && executorHolder.close()) {
+        executorHolder = null;
+      }
     }
     delegate.close();
   }
