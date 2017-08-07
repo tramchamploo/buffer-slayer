@@ -31,8 +31,8 @@ public class FakeSender implements Sender<TestMessage, Integer> {
     if (closed.get()) {
       throw new IllegalStateException("Closed!");
     }
-    onMessages.accept(messages);
     sent.addAll(messages);
+    onMessages.accept(messages);
     Integer[] ret = new Integer[messages.size()];
     for (int i = 0; i < messages.size(); i++) {
       ret[i] = messages.get(i).key;
