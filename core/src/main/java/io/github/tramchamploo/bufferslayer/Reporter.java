@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit;
 import org.jdeferred.Promise;
 
 /**
- * Created by tramchamploo on 2017/2/27.
+ * Reporter that reports messages to sender
  */
 public interface Reporter<M extends Message, R> extends Component {
 
