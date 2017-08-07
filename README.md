@@ -54,7 +54,7 @@ For **rx-java** implementation:
 ```java
 AsyncReporterProperties reporterProperties = new AsyncReporterProperties()
         .setFlushThreads(5)
-        .setSenderThreads(10)
+        .setSharedSenderThreads(10)
         .setBufferedMaxMessages(500)
         .setPendingMaxMessages(10000)
         .setMetrics("inmemory")
