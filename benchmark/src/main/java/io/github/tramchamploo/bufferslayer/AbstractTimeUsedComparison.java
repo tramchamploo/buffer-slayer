@@ -8,9 +8,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
-/**
- * Created by tramchamploo on 2017/3/30.
- */
 public abstract class AbstractTimeUsedComparison {
 
   static String randomString() {
@@ -38,10 +35,10 @@ public abstract class AbstractTimeUsedComparison {
     AtomicLong counter = new AtomicLong();
 
     final String CREATE_DATABASE = "CREATE DATABASE IF NOT EXISTS test";
-    final String CREATE_TABLE = "CREATE TABLE test.benchmark(id INT PRIMARY KEY AUTO_INCREMENT, data VARCHAR(32), time TIMESTAMP);";
-    final String DROP_TABLE = "DROP TABLE IF EXISTS test.benchmark;";
-    final String INSERTION = "INSERT INTO test.benchmark(data, time) VALUES(?, ?);";
-    final String MODIFICATION = "UPDATE test.benchmark SET data = ? WHERE id = ?;";
+    final String CREATE_TABLE = "CREATE TABLE test.benchmark(id INT PRIMARY KEY AUTO_INCREMENT, data VARCHAR(32), time TIMESTAMP)";
+    final String DROP_TABLE = "DROP TABLE IF EXISTS test.benchmark";
+    final String INSERTION = "INSERT INTO test.benchmark(data, time) VALUES(?, ?)";
+    final String MODIFICATION = "UPDATE test.benchmark SET data = ? WHERE id = ?";
 
     CountDownLatch countDown = new CountDownLatch(1);
 
