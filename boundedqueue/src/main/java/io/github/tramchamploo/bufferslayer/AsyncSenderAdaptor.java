@@ -3,26 +3,24 @@ package io.github.tramchamploo.bufferslayer;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.github.tramchamploo.bufferslayer.internal.Deferreds;
+import io.github.tramchamploo.bufferslayer.internal.SendingTask;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy;
-import java.util.concurrent.TimeUnit;
 import org.jdeferred.Deferred;
 import org.jdeferred.Promise;
-import org.jdeferred.impl.DeferredObject;
+import org.jdeferred.multiple.MasterDeferredObject;
+import org.jdeferred.multiple.MasterProgress;
+import org.jdeferred.multiple.MultipleResults;
+import org.jdeferred.multiple.OneReject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Convert a synchronous sender to an async one by submitting tasks to an executor
  */
-final class AsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M, R> {
+final class AsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M> {
 
   private static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
   static SenderExecutorHolder executorHolder;
@@ -42,20 +40,24 @@ final class AsyncSenderAdaptor<M extends Message, R> implements AsyncSender<M, R
   }
 
   @Override
-  public Promise<List<R>, MessageDroppedException, ?> send(final List<M> messages) {
-    logger.debug("Sending {} messages.", messages.size());
-    final Deferred<List<R>, MessageDroppedException, ?> result = new DeferredObject<>();
+  @SuppressWarnings("unchecked")
+  public Promise<MultipleResults, OneReject, MasterProgress> send(final List<SendingTask<M>> tasks) {
+    logger.debug("Sending {} messages.", tasks.size());
+    Object[] messageAndDeferred = SendingTask.unzipGeneric(tasks);
+    final List<M> messages = (List<M>) messageAndDeferred[0];
+    final List<Deferred> deferreds = (List<Deferred>) messageAndDeferred[1];
     executor.execute(new Runnable() {
       @Override
       public void run() {
         try {
-          result.resolve(delegate.send(messages));
+          List<R> result = delegate.send(messages);
+          Deferreds.resolveAll(result, deferreds);
         } catch (Throwable t) {
-          result.reject(MessageDroppedException.dropped(t, messages));
+          Deferreds.rejectAll(t, deferreds, messages);
         }
       }
     });
-    return result.promise();
+    return new MasterDeferredObject(deferreds.toArray(new Deferred[0])).promise();
   }
 
   @Override

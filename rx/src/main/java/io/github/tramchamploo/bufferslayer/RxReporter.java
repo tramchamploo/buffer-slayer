@@ -1,12 +1,12 @@
 package io.github.tramchamploo.bufferslayer;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static io.github.tramchamploo.bufferslayer.DeferredHolder.newDeferred;
 import static io.github.tramchamploo.bufferslayer.MessageDroppedException.dropped;
 import static java.util.Collections.singletonList;
 
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
+import io.github.tramchamploo.bufferslayer.internal.SendingTask;
 import io.reactivex.BackpressureOverflowStrategy;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
@@ -29,7 +29,7 @@ import org.jdeferred.impl.DeferredObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class RxReporter<M extends Message, R> implements Reporter<M, R>, FlowableOnSubscribe<M> {
+public class RxReporter<M extends Message, R> implements Reporter<M, R>, FlowableOnSubscribe<SendingTask<M>> {
 
   static final Logger logger = LoggerFactory.getLogger(RxReporter.class);
 
@@ -41,7 +41,7 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
   final ReporterMetrics metrics;
   final AtomicBoolean closed = new AtomicBoolean(false);
 
-  private FlowableEmitter<M> emitter;
+  private FlowableEmitter<SendingTask<M>> emitter;
   private Scheduler scheduler;
 
   private RxReporter(Builder<M, R> builder) {
@@ -54,23 +54,23 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
     this.overflowStrategy = builder.overflowStrategy;
     this.scheduler = builder.scheduler;
 
-    Flowable<M> flowable = Flowable.create(this, BackpressureStrategy.MISSING);
+    Flowable<SendingTask<M>> flowable = Flowable.create(this, BackpressureStrategy.MISSING);
     initBackpressurePolicy(flowable)
         .observeOn(Schedulers.single())
-        .groupBy(new MessagePartitioner<>())
-        .subscribe(new MessageGroupSubscriber<>(messageTimeoutNanos, bufferedMaxMessages, sender, scheduler));
+        .groupBy(new MessagePartitioner())
+        .subscribe(new MessageGroupSubscriber(messageTimeoutNanos, bufferedMaxMessages, sender, scheduler));
   }
 
   public static <M extends Message, R> Builder<M, R> builder(Sender<M, R> sender) {
     return new Builder<>(sender);
   }
 
-  private Flowable<M> initBackpressurePolicy(Flowable<M> flowable) {
+  private Flowable<SendingTask<M>> initBackpressurePolicy(Flowable<SendingTask<M>> flowable) {
     Strategy strategy = this.overflowStrategy;
     if (strategy == Strategy.DropNew) {
-      return flowable.onBackpressureDrop(new Consumer<M>() {
+      return flowable.onBackpressureDrop(new Consumer<SendingTask<M>>() {
         @Override
-        public void accept(M m) throws Exception {
+        public void accept(SendingTask<M> task) throws Exception {
           metricsCallback(1);
         }
       });
@@ -108,8 +108,7 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
     }
   }
 
-  private static class MessageGroupSubscriber<M extends Message, R>
-      implements Consumer<GroupedFlowable<MessageKey, M>> {
+  private class MessageGroupSubscriber implements Consumer<GroupedFlowable<MessageKey, SendingTask<M>>> {
 
     final long messageTimeoutNanos;
     final int bufferedMaxMessages;
@@ -127,17 +126,17 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
     }
 
     @Override
-    public void accept(GroupedFlowable<MessageKey, M> group) throws Exception {
-      Flowable<List<M>> bufferedMessages = group.buffer(messageTimeoutNanos, TimeUnit.NANOSECONDS, scheduler, bufferedMaxMessages);
+    public void accept(GroupedFlowable<MessageKey, SendingTask<M>> group) throws Exception {
+      Flowable<List<SendingTask<M>>> bufferedMessages = group.buffer(messageTimeoutNanos, TimeUnit.NANOSECONDS, scheduler, bufferedMaxMessages);
       bufferedMessages.subscribeOn(scheduler).subscribe(SenderConsumerBridge.toConsumer(sender));
     }
   }
 
-  private static class MessagePartitioner<M extends Message> implements Function<M, MessageKey> {
+  private class MessagePartitioner implements Function<SendingTask<M>, MessageKey> {
 
     @Override
-    public MessageKey apply(M m) throws Exception {
-      return m.asMessageKey();
+    public MessageKey apply(SendingTask<M> task) throws Exception {
+      return task.message.asMessageKey();
     }
   }
 
@@ -147,6 +146,7 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public Promise<R, MessageDroppedException, ?> report(M message) {
     checkNotNull(message, "message");
     metrics.incrementMessages(1);
@@ -158,8 +158,8 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
       return deferred.promise();
     }
 
-    Deferred<R, MessageDroppedException, Integer> deferred = newDeferred(message.id);
-    emitter.onNext(message);
+    Deferred<R, MessageDroppedException, Integer> deferred = new DeferredObject<>();
+    emitter.onNext(new SendingTask(message, deferred));
     return deferred.promise().fail(loggingCallback());
   }
 
@@ -174,7 +174,7 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
   }
 
   @Override
-  public void subscribe(FlowableEmitter<M> emitter) throws Exception {
+  public void subscribe(FlowableEmitter<SendingTask<M>> emitter) throws Exception {
     this.emitter = emitter;
   }
 

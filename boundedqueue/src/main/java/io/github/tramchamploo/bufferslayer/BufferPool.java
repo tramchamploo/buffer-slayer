@@ -1,8 +1,7 @@
 package io.github.tramchamploo.bufferslayer;
 
 /**
- * Created by tramchamploo on 2017/6/1.
- *  A buffer pool which keeps a free list of direct buffers of a specified default
+ * A buffer pool which keeps a free list of direct buffers of a specified default
  * size in a simple fixed size stack.
  */
 final class BufferPool {
@@ -19,7 +18,7 @@ final class BufferPool {
     this.onlyAcceptSame = onlyAcceptSame;
   }
 
-  Buffer acquire() {
+  <M extends Message> Buffer<M> acquire() {
     synchronized (this) {
       if (next != null) {
         Buffer result = next;
@@ -30,7 +29,7 @@ final class BufferPool {
         return result;
       }
     }
-    return new Buffer(bufferSize, onlyAcceptSame);
+    return new Buffer<>(bufferSize, onlyAcceptSame);
   }
 
   void release(Buffer buffer) {

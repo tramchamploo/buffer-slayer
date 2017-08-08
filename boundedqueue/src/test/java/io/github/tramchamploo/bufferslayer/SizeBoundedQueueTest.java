@@ -6,6 +6,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import io.github.tramchamploo.bufferslayer.internal.SendingTask;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -13,13 +14,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.jdeferred.Deferred;
+import org.jdeferred.impl.DeferredObject;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-/**
- * Created by tramchamploo on 2017/3/14.
- */
 public class SizeBoundedQueueTest {
 
   @Rule
@@ -28,22 +27,17 @@ public class SizeBoundedQueueTest {
   OverflowStrategy.Strategy dropNew = OverflowStrategy.dropNew;
   SizeBoundedQueue queue = new SizeBoundedQueue(16, dropNew);
 
-  private static Deferred<Object, MessageDroppedException, Integer> newDeferred(Message next) {
-    return DeferredHolder.newDeferred(next.id);
-  }
-
   @Test
   public void offer_failsWhenFull_size() {
     AtomicBoolean success = new AtomicBoolean(true);
     for (int i = 0; i < queue.maxSize; i++) {
       Message next = newMessage(i);
-      queue.offer(next, newDeferred(next));
+      queue.offer(next, new DeferredObject<>());
       assertTrue(success.get());
     }
 
     Message shouldFail = newMessage(0);
-    Deferred<Object, MessageDroppedException, Integer> deferred = newDeferred(
-        shouldFail);
+    Deferred<Object, MessageDroppedException, Integer> deferred = new DeferredObject<>();
     deferred.promise().fail(obj -> success.set(false));
     queue.offer(shouldFail, deferred);
     assertFalse(success.get());
@@ -53,7 +47,7 @@ public class SizeBoundedQueueTest {
   public void offer_updatesCount() {
     for (int i = 0; i < queue.maxSize; i++) {
       Message next = newMessage(i);
-      queue.offer(next, newDeferred(next));
+      queue.offer(next, new DeferredObject<>());
     }
     assertEquals(queue.maxSize, queue.count);
   }
@@ -63,13 +57,13 @@ public class SizeBoundedQueueTest {
     SizeBoundedQueue queue = new SizeBoundedQueue(16, OverflowStrategy.fail);
     for (int i = 0; i < queue.maxSize; i++) {
       Message next = newMessage(i);
-      queue.offer(next, newDeferred(next));
+      queue.offer(next, new DeferredObject<>());
     }
 
     thrown.expect(BufferOverflowException.class);
     thrown.expectMessage("Max size of 16 is reached.");
     Message overflow = newMessage(10);
-    queue.offer(overflow, newDeferred(overflow));
+    queue.offer(overflow, new DeferredObject<>());
   }
 
   @Test
@@ -79,7 +73,7 @@ public class SizeBoundedQueueTest {
 
     for (int i = 0; i < queue.maxSize; i++) {
       Message next = newMessage(i);
-      Deferred<Object, MessageDroppedException, Integer> deferred = newDeferred(next);
+      Deferred<Object, MessageDroppedException, Integer> deferred = new DeferredObject<>();
       queue.offer(next, deferred);
       if (i == 0) {
         deferred.fail(ex -> {
@@ -89,7 +83,7 @@ public class SizeBoundedQueueTest {
       }
     }
     Message overflow = newMessage(queue.maxSize);
-    queue.offer(overflow, newDeferred(overflow));
+    queue.offer(overflow, new DeferredObject<>());
     countDown.await();
 
     Object[] ids = collectKeys(queue);
@@ -103,7 +97,7 @@ public class SizeBoundedQueueTest {
 
     for (int i = 0; i < queue.maxSize; i++) {
       Message next = newMessage(i);
-      Deferred<Object, MessageDroppedException, Integer> deferred = newDeferred(next);
+      Deferred<Object, MessageDroppedException, Integer> deferred = new DeferredObject<>();
       queue.offer(next, deferred);
       if (i == queue.maxSize - 1) {
         deferred.fail(ex -> {
@@ -113,7 +107,7 @@ public class SizeBoundedQueueTest {
       }
     }
     Message overflow = newMessage(queue.maxSize);
-    Deferred<Object, MessageDroppedException, Integer> deferred = newDeferred(overflow);
+    Deferred<Object, MessageDroppedException, Integer> deferred = new DeferredObject<>();
     queue.offer(overflow, deferred);
     countDown.await();
 
@@ -128,7 +122,7 @@ public class SizeBoundedQueueTest {
 
     for (int i = 0; i < queue.maxSize; i++) {
       TestMessage next = newMessage(i);
-      Deferred<Object, MessageDroppedException, Integer> deferred = newDeferred(next);
+      Deferred<Object, MessageDroppedException, Integer> deferred = new DeferredObject<>();
       queue.offer(next, deferred);
       if (i == 0) {
         deferred.fail(ex -> {
@@ -141,7 +135,7 @@ public class SizeBoundedQueueTest {
     }
 
     Message overflow = newMessage(queue.maxSize);
-    queue.offer(overflow, newDeferred(overflow));
+    queue.offer(overflow, new DeferredObject<>());
     countDown.await();
 
     Object[] ids = collectKeys(queue);
@@ -153,13 +147,13 @@ public class SizeBoundedQueueTest {
     SizeBoundedQueue queue = new SizeBoundedQueue(16, OverflowStrategy.block);
     for (int i = 0; i < queue.maxSize; i++) {
       TestMessage next = newMessage(i);
-      queue.offer(next, newDeferred(next));
+      queue.offer(next, new DeferredObject<>());
     }
 
     CountDownLatch countDown = new CountDownLatch(1);
     new Thread(() -> {
       TestMessage shouldBlock = newMessage(10);
-      queue.offer(shouldBlock, newDeferred(shouldBlock));
+      queue.offer(shouldBlock, new DeferredObject<>());
       countDown.countDown();
     }).start();
     assertFalse(countDown.await(5, TimeUnit.MILLISECONDS));
@@ -171,19 +165,19 @@ public class SizeBoundedQueueTest {
   public void circular() {
     SizeBoundedQueue queue = new SizeBoundedQueue(16, dropNew);
 
-    List<Message> polled = new ArrayList<>();
+    List<SendingTask> polled = new ArrayList<>();
     SizeBoundedQueue.Consumer consumer = polled::add;
 
     // Offer more than the capacity, flushing via poll on interval
     for (byte i = 0; i < 20; i++) {
       Message next = newMessage(i);
-      queue.offer(next, newDeferred(next));
+      queue.offer(next, new DeferredObject<>());
       queue.drainTo(consumer);
     }
 
     // ensure we have all of the elements
     Object[] ids = polled.stream()
-        .map(m -> ((TestMessage) m).key)
+        .map(m -> ((TestMessage) m.message).key)
         .collect(Collectors.toList())
         .toArray();
 
@@ -191,11 +185,11 @@ public class SizeBoundedQueueTest {
   }
 
   private Object[] collectKeys(SizeBoundedQueue queue) {
-    List<Message> polled = new ArrayList<>();
+    List<SendingTask> polled = new ArrayList<>();
     SizeBoundedQueue.Consumer consumer = polled::add;
     queue.drainTo(consumer);
     return polled.stream()
-        .map(m -> ((TestMessage) m).key)
+        .map(m -> ((TestMessage) m.message).key)
         .collect(Collectors.toList())
         .toArray();
   }

@@ -30,15 +30,15 @@ public class MessageDroppedException extends RuntimeException {
     this.overflow = false;
   }
 
-  static MessageDroppedException dropped(Strategy overflowStrategy, Message dropped) {
+  public static MessageDroppedException dropped(Strategy overflowStrategy, Message dropped) {
     return new MessageDroppedException(overflowStrategy, singletonList(dropped));
   }
 
-  static MessageDroppedException dropped(Strategy overflowStrategy, List<Message> dropped) {
+  public static MessageDroppedException dropped(Strategy overflowStrategy, List<Message> dropped) {
     return new MessageDroppedException(overflowStrategy, dropped);
   }
 
-  static MessageDroppedException dropped(Throwable cause, List<? extends Message> dropped) {
+  public static MessageDroppedException dropped(Throwable cause, List<? extends Message> dropped) {
     return new MessageDroppedException(cause, dropped);
   }
 }

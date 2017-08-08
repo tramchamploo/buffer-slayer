@@ -1,6 +1,5 @@
 package io.github.tramchamploo.bufferslayer;
 
-import static io.github.tramchamploo.bufferslayer.DeferredHolder.reject;
 import static io.github.tramchamploo.bufferslayer.MessageDroppedException.dropped;
 import static io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy.DropBuffer;
 import static io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy.DropHead;
@@ -9,6 +8,7 @@ import static io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy.Drop
 
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
+import io.github.tramchamploo.bufferslayer.internal.SendingTask;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -17,21 +17,20 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.jdeferred.Deferred;
 
 /**
- * Created by tramchamploo on 2017/2/28.
- *
  * Adapted from zipkin
  * Multi-producer, multi-consumer queue that is bounded by count.
  *
  * <p>This is similar to {@link java.util.concurrent.ArrayBlockingQueue} in implementation.
  */
+@SuppressWarnings("unchecked")
 final class SizeBoundedQueue {
 
-  interface Consumer {
+  interface Consumer<M extends Message> {
 
     /**
      * Returns true if it accepted the next element
      */
-    boolean accept(Message next);
+    boolean accept(SendingTask<M> next);
   }
 
   static final int DEFAULT_CAPACITY = 10;
@@ -44,14 +43,14 @@ final class SizeBoundedQueue {
   final Strategy overflowStrategy;
   final MessageKey key;
 
-  Message[] elements;
+  SendingTask[] elements;
   int count;
   int writePos;
   int readPos;
 
   SizeBoundedQueue(int maxSize, Strategy overflowStrategy, MessageKey key) {
     int initialCapacity = DEFAULT_CAPACITY > maxSize ? maxSize : DEFAULT_CAPACITY;
-    this.elements = new Message[initialCapacity];
+    this.elements = new SendingTask[initialCapacity];
     this.maxSize = maxSize;
     this.overflowStrategy = overflowStrategy;
     this.key = key;
@@ -67,32 +66,33 @@ final class SizeBoundedQueue {
    * {@link OverflowStrategy.Strategy}.
    */
   void offer(Message next, Deferred<?, MessageDroppedException, Integer> deferred) {
+    SendingTask task = new SendingTask(next, deferred);
     lock.lock();
     try {
       ensureCapacity(count + 1);
       if (isFull()) {
         switch (overflowStrategy) {
           case DropNew:
-            reject(dropped(DropNew, next));
+            deferred.reject(dropped(DropNew, next));
             return;
           case DropTail:
-            Message tail = dropTail();
-            enqueue(next);
+            SendingTask tail = dropTail();
+            enqueue(task);
             deferred.notify(1);
-            reject(dropped(DropTail, tail));
+            tail.deferred.reject(dropped(DropTail, tail.message));
             return;
           case DropHead:
-            Message head = dropHead();
-            enqueue(next);
+            SendingTask head = dropHead();
+            enqueue(task);
             deferred.notify(1);
-            reject(dropped(DropHead, head));
+            head.deferred.reject(dropped(DropHead, head.message));
             return;
           case DropBuffer:
-            List<Message> allElements = removeAll();
+            List<SendingTask> allElements = removeAll();
             doClear();
-            enqueue(next);
+            enqueue(task);
             deferred.notify(1);
-            reject(dropped(DropBuffer, allElements));
+            rejectAll(allElements, DropBuffer);
             return;
           case Block:
             break;
@@ -100,10 +100,20 @@ final class SizeBoundedQueue {
             throw new BufferOverflowException("Max size of " + count + " is reached.");
         }
       }
-      enqueue(next);
+      enqueue(task);
       deferred.notify(1);
     } finally {
       lock.unlock();
+    }
+  }
+
+
+  private void rejectAll(List<SendingTask> tasks, Strategy overflowStrategy) {
+    Object[] messageAndDeferred = SendingTask.unzip(tasks);
+    List<Message> messages = (List<Message>) messageAndDeferred[0];
+    List<Deferred> deferreds = (List<Deferred>) messageAndDeferred[1];
+    for (Deferred deferred : deferreds) {
+      deferred.reject(dropped(overflowStrategy, messages));
     }
   }
 
@@ -138,11 +148,11 @@ final class SizeBoundedQueue {
   /**
    * Drop the last element
    */
-  private Message dropTail() {
+  private SendingTask dropTail() {
     if (--writePos == -1) {
       writePos = elements.length - 1; // circle forward to the end of the array
     }
-    Message tail = elements[writePos];
+    SendingTask tail = elements[writePos];
     elements[writePos] = null;
     count--;
     notFull.signal();
@@ -152,8 +162,8 @@ final class SizeBoundedQueue {
   /**
    * Drop the first element
    */
-  private Message dropHead() {
-    Message head = elements[readPos];
+  private SendingTask dropHead() {
+    SendingTask head = elements[readPos];
     elements[readPos] = null;
     if (++readPos == elements.length) {
       readPos = 0; // circle back to the front of the array
@@ -163,7 +173,7 @@ final class SizeBoundedQueue {
     return head;
   }
 
-  private void enqueue(Message next) {
+  private void enqueue(SendingTask next) {
     try {
       while (isFull()) {
         notFull.await();
@@ -180,11 +190,11 @@ final class SizeBoundedQueue {
     }
   }
 
-  private List<Message> removeAll() {
-    final List<Message> result = new LinkedList<>();
+  private List<SendingTask> removeAll() {
+    final List<SendingTask> result = new LinkedList<>();
     doDrain(new Consumer() {
       @Override
-      public boolean accept(Message next) {
+      public boolean accept(SendingTask next) {
         return result.add(next);
       }
     });
@@ -200,10 +210,11 @@ final class SizeBoundedQueue {
     }
   }
 
+  @SuppressWarnings("unchecked")
   private int doDrain(Consumer consumer) {
     int drainedCount = 0;
     while (drainedCount < count) {
-      Message next = elements[readPos];
+      SendingTask next = elements[readPos];
 
       if (next == null) {
         break;

@@ -1,17 +1,18 @@
 package io.github.tramchamploo.bufferslayer;
 
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
+import io.github.tramchamploo.bufferslayer.internal.SendingTask;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-final class Buffer implements SizeBoundedQueue.Consumer {
+final class Buffer<M extends Message> implements SizeBoundedQueue.Consumer<M> {
 
   private final int maxSize;
   private final boolean onlyAcceptSame;
 
-  final List<Message> buffer = new LinkedList<>();
+  final List<SendingTask<M>> buffer = new LinkedList<>();
   boolean bufferFull;
   Message.MessageKey lastMessageKey;
   boolean ofTheSameKey = true;
@@ -23,12 +24,12 @@ final class Buffer implements SizeBoundedQueue.Consumer {
   }
 
   @Override
-  public boolean accept(Message next) {
+  public boolean accept(SendingTask<M> next) {
     if (bufferFull) {
       return false;
     }
     if (onlyAcceptSame) {
-      MessageKey nextKey = next.asMessageKey();
+      MessageKey nextKey = next.message.asMessageKey();
       if (lastMessageKey == null) {
         lastMessageKey = nextKey;
       } else if (!lastMessageKey.equals(nextKey)) {
@@ -41,11 +42,11 @@ final class Buffer implements SizeBoundedQueue.Consumer {
     return true;
   }
 
-  List<Message> drain() {
+  List<SendingTask<M>> drain() {
     if (buffer.isEmpty()) {
       return Collections.emptyList();
     }
-    ArrayList<Message> result = new ArrayList<>(buffer);
+    ArrayList<SendingTask<M>> result = new ArrayList<>(buffer);
     clear();
     return result;
   }

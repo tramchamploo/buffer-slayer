@@ -2,6 +2,7 @@ package io.github.tramchamploo.bufferslayer;
 
 import java.util.concurrent.TimeUnit;
 import org.jdeferred.Deferred;
+import org.jdeferred.impl.DeferredObject;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -28,11 +29,8 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @State(Scope.Group)
+@SuppressWarnings("unchecked")
 public class SizeBoundedQueueBenchmark {
-
-  static Deferred<?, MessageDroppedException, Integer> newDeferred(long id) {
-    return DeferredHolder.newDeferred(id);
-  }
 
   static Message newMessage() {
     return TestMessage.newMessage(0);
@@ -46,7 +44,7 @@ public class SizeBoundedQueueBenchmark {
     @Setup(Level.Invocation)
     public void setup() {
       message = newMessage();
-      deferred = newDeferred(message.id);
+      deferred = new DeferredObject<>();
     }
   }
 
@@ -112,7 +110,7 @@ public class SizeBoundedQueueBenchmark {
   public void no_contention_drain(DrainCounters counters, ConsumerMarker cm) {
     q.drainTo(next -> {
       counters.drained++;
-      DeferredHolder.resolve(next.id, null);
+      next.deferred.resolve(null);
       return true;
     });
   }
@@ -127,7 +125,7 @@ public class SizeBoundedQueueBenchmark {
   public void mild_contention_drain(DrainCounters counters, ConsumerMarker cm) {
     q.drainTo(next -> {
       counters.drained++;
-      DeferredHolder.resolve(next.id, null);
+      next.deferred.resolve(null);
       return true;
     });
   }
@@ -142,7 +140,7 @@ public class SizeBoundedQueueBenchmark {
   public void high_contention_drain(DrainCounters counters, ConsumerMarker cm) {
     q.drainTo(next -> {
       counters.drained++;
-      DeferredHolder.resolve(next.id, null);
+      next.deferred.resolve(null);
       return true;
     });
   }

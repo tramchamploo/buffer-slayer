@@ -30,10 +30,10 @@ public abstract class AbstractBatchJdbcTemplateBenchmark {
   private static AtomicLong counter = new AtomicLong();
 
   private static final String CREATE_DATABASE = "CREATE DATABASE IF NOT EXISTS test";
-  private static final String CREATE_TABLE = "CREATE TABLE test.benchmark(id INT PRIMARY KEY AUTO_INCREMENT, data VARCHAR(32), time TIMESTAMP);";
-  private static final String DROP_TABLE = "DROP TABLE IF EXISTS test.benchmark;";
-  private static final String TRUNCATE_TABLE = "TRUNCATE TABLE test.benchmark;";
-  private static final String INSERTION = "INSERT INTO test.benchmark(data, time) VALUES(?, ?);";
+  private static final String CREATE_TABLE = "CREATE TABLE test.benchmark(id INT PRIMARY KEY AUTO_INCREMENT, data VARCHAR(32), time TIMESTAMP)";
+  private static final String DROP_TABLE = "DROP TABLE IF EXISTS test.benchmark";
+  private static final String TRUNCATE_TABLE = "TRUNCATE TABLE test.benchmark";
+  private static final String INSERTION = "INSERT INTO test.benchmark(data, time) VALUES(?, ?)";
 
   static String propertyOr(String key, String fallback) {
     return System.getProperty(key, fallback);
