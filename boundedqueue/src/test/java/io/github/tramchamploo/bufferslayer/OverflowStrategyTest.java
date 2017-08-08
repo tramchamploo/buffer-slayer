@@ -1,7 +1,5 @@
 package io.github.tramchamploo.bufferslayer;
 
-import static org.junit.Assert.assertEquals;
-
 import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
 import org.junit.Assert;
 import org.junit.Rule;

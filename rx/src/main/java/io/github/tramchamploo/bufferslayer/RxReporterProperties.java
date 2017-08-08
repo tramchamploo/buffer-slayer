@@ -1,7 +1,6 @@
 package io.github.tramchamploo.bufferslayer;
 
 import io.github.tramchamploo.bufferslayer.RxReporter.Builder;
-
 import java.util.concurrent.TimeUnit;
 
 public class RxReporterProperties extends AbstractReporterProperties<RxReporterProperties> {

@@ -3,12 +3,12 @@ package io.github.tramchamploo.bufferslayer;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static io.github.tramchamploo.bufferslayer.MessageDroppedException.dropped;
-import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.QueueManager.Callback;
+import io.github.tramchamploo.bufferslayer.internal.SendingTask;
 import java.io.Flushable;
 import java.util.Collection;
 import java.util.List;
@@ -21,16 +21,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.jdeferred.Deferred;
-import org.jdeferred.DoneCallback;
 import org.jdeferred.FailCallback;
 import org.jdeferred.Promise;
 import org.jdeferred.impl.DeferredObject;
+import org.jdeferred.multiple.MasterProgress;
+import org.jdeferred.multiple.MultipleResults;
+import org.jdeferred.multiple.OneReject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Created by tramchamploo on 2017/2/28.
- */
 public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> implements Reporter<M, R>, Flushable {
 
   static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
@@ -39,7 +38,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
 
   static AtomicLong idGenerator = new AtomicLong();
   final Long id = idGenerator.getAndIncrement();
-  final AsyncSender<M, R> sender;
+  final AsyncSender<M> sender;
   final ReporterMetrics metrics;
   final long messageTimeoutNanos;
   final int bufferedMaxMessages;
@@ -79,7 +78,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     }
   }
 
-  AsyncSender<M, R> toAsyncSender(Builder<M, R> builder) {
+  AsyncSender<M> toAsyncSender(Builder<M, R> builder) {
     return new AsyncSenderAdaptor<>(builder.sender, builder.sharedSenderThreads);
   }
 
@@ -180,7 +179,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
 
     // Offer message to pending queue.
     SizeBoundedQueue pending = queueManager.getOrCreate(key);
-    Deferred<R, MessageDroppedException, Integer> deferred = DeferredHolder.newDeferred(message.id);
+    Deferred<R, MessageDroppedException, Integer> deferred = new DeferredObject<>();
     pending.offer(message, deferred);
     if (pending.size() >= bufferedMaxMessages)
       synchronizer.offer(pending);
@@ -211,7 +210,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   public void flush() {
     try {
       for (SizeBoundedQueue pending : queueManager.elements()) {
-        Promise<List<R>, MessageDroppedException, ?> promise = flush(pending);
+        Promise<MultipleResults, OneReject, MasterProgress> promise = flush(pending);
         promise.waitSafely();
       }
     } catch (InterruptedException e) {
@@ -220,24 +219,22 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   }
 
   @SuppressWarnings("unchecked")
-  Promise<List<R>, MessageDroppedException, ?> flush(SizeBoundedQueue pending) {
-    Buffer buffer = bufferPool.acquire();
+  Promise<MultipleResults, OneReject, MasterProgress> flush(SizeBoundedQueue pending) {
+    Buffer<M> buffer = bufferPool.acquire();
     try {
       int drained = pending.drainTo(buffer);
       // Remove overtime queues and relative metrics and timer
       List<MessageKey> shrinked = queueManager.shrink();
       clearMetricsAndTimer(shrinked);
       if (drained == 0) {
-        List<R> empty = emptyList();
-        return new DeferredObject<List<R>, MessageDroppedException, Object>()
-            .resolve(empty)
-            .promise();
+        return new DeferredObject<MultipleResults, OneReject, MasterProgress>()
+            .resolve(new MultipleResults(0)).promise();
       }
       // Update metrics
       metrics.updateQueuedMessages(pending.key, pending.count);
-      final List<M> messages = (List<M>) buffer.drain();
-      Promise<List<R>, MessageDroppedException, ?> promise = sender.send(messages);
-      addCallbacks(messages, promise);
+      final List<SendingTask<M>> tasks = buffer.drain();
+      Promise<MultipleResults, OneReject, MasterProgress> promise = sender.send(tasks);
+      promise.fail(loggingCallback());
       return promise;
     } finally {
       bufferPool.release(buffer);
@@ -252,31 +249,14 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   }
 
   /**
-   * Resolve the promises returned to the caller by sending result.
-   */
-  private void addCallbacks(final List<M> messages,
-      Promise<List<R>, MessageDroppedException, ?> promise) {
-    promise.done(new DoneCallback<List<R>>() {
-      @Override
-      public void onDone(List<R> result) {
-        DeferredHolder.batchResolve(messages, result);
-      }
-    }).fail(new FailCallback<MessageDroppedException>() {
-      @Override
-      public void onFail(MessageDroppedException reject) {
-        DeferredHolder.batchReject(messages, reject);
-      }
-    }).fail(loggingCallback());
-  }
-
-  /**
    * Log errors only when sending fails.
    */
-  private FailCallback<MessageDroppedException> loggingCallback() {
-    return new FailCallback<MessageDroppedException>() {
+  private FailCallback<OneReject> loggingCallback() {
+    return new FailCallback<OneReject>() {
       @Override
-      public void onFail(MessageDroppedException reject) {
-        logger.warn(reject.getMessage());
+      public void onFail(OneReject reject) {
+        MessageDroppedException ex = (MessageDroppedException) reject.getReject();
+        logger.warn(ex.getMessage());
       }
     };
   }

@@ -1,6 +1,6 @@
 package io.github.tramchamploo.bufferslayer;
 
-import static io.github.tramchamploo.bufferslayer.internal.Util.propertyOr;
+import static io.github.tramchamploo.bufferslayer.internal.Properties.propertyOr;
 
 import fi.iki.elonen.NanoHTTPD;
 import java.io.IOException;

@@ -1,6 +1,6 @@
 package io.github.tramchamploo.bufferslayer;
 
-import static io.github.tramchamploo.bufferslayer.TestMessage.newMessage;
+import static io.github.tramchamploo.bufferslayer.Util.newSendingTask;
 import static java.util.Collections.singletonList;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -10,12 +10,13 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.jdeferred.Promise;
+import org.jdeferred.multiple.MasterProgress;
+import org.jdeferred.multiple.MultipleResults;
+import org.jdeferred.multiple.OneReject;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -36,16 +37,25 @@ public class AsyncSenderAdaptorTest {
     adaptor.close();
   }
 
+  private Object[] collectResults(MultipleResults mr) {
+    int size = mr.size();
+    Object[] results = new Object[size];
+    for (int i = 0 ; i < size; i++) {
+      results[i] = mr.get(i).getResult();
+    }
+    return results;
+  }
+
   @Test
   public void sendingSuccess() throws InterruptedException {
     FakeSender sender = new FakeSender();
     CountDownLatch countDown = new CountDownLatch(1);
 
     adaptor = new AsyncSenderAdaptor<>(sender, 1);
-    Promise<List<Integer>, MessageDroppedException, ?> promise = adaptor.send(
-        Arrays.asList(newMessage(0), newMessage(1), newMessage(2)));
-    promise.done(d -> {
-      assertArrayEquals(new Integer[]{0, 1, 2}, d.toArray());
+    Promise<MultipleResults, OneReject, MasterProgress> promise = adaptor.send(
+        Arrays.asList(newSendingTask(0), newSendingTask(1), newSendingTask(2)));
+    promise.done(mr -> {
+      assertArrayEquals(new Integer[]{0, 1, 2}, collectResults(mr));
       countDown.countDown();
     });
     assertTrue(countDown.await(500, TimeUnit.MILLISECONDS));
@@ -61,10 +71,10 @@ public class AsyncSenderAdaptorTest {
     CountDownLatch countDown = new CountDownLatch(1);
 
     adaptor = new AsyncSenderAdaptor<>(sender, 1);
-    Promise<List<Integer>, MessageDroppedException, ?> promise = adaptor.send(
-        Arrays.asList(newMessage(0), newMessage(1), newMessage(2)));
+    Promise<MultipleResults, OneReject, MasterProgress> promise = adaptor.send(
+        Arrays.asList(newSendingTask(0), newSendingTask(1), newSendingTask(2)));
     promise.fail(t -> {
-      assertEquals(ex, t.getCause());
+      assertEquals(ex, ((MessageDroppedException) t.getReject()).getCause());
       countDown.countDown();
     });
     assertTrue(countDown.await(500, TimeUnit.MILLISECONDS));
@@ -87,12 +97,12 @@ public class AsyncSenderAdaptorTest {
 
     adaptor = new AsyncSenderAdaptor<>(sender, 1);
     // block sender thread
-    adaptor.send(singletonList(newMessage(0))).done(d -> {
+    adaptor.send(singletonList(newSendingTask(0))).done(d -> {
       assertTrue(Thread.currentThread().getName().startsWith("AsyncReporter-sender-"));
       countDown.countDown();
     });
     // caller runs and reset barrier
-    adaptor.send(singletonList(newMessage(0))).done(d -> {
+    adaptor.send(singletonList(newSendingTask(0))).done(d -> {
       assertEquals("main", Thread.currentThread().getName());
       countDown.countDown();
     });
@@ -112,7 +122,7 @@ public class AsyncSenderAdaptorTest {
     CountDownLatch countDown = new CountDownLatch(1);
 
     adaptor = new AsyncSenderAdaptor<>(sender, 1);
-    adaptor.send(singletonList(newMessage(0))).done(i -> countDown.countDown());
+    adaptor.send(singletonList(newSendingTask(0))).done(i -> countDown.countDown());
     assertTrue(countDown.await(500, TimeUnit.MILLISECONDS));
   }
 

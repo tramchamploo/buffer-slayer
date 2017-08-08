@@ -1,13 +1,11 @@
 package io.github.tramchamploo.bufferslayer;
 
+import static io.github.tramchamploo.bufferslayer.Util.newSendingTask;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 import org.junit.Test;
 
-/**
- * Created by tramchamploo on 2017/6/2.
- */
 public class BufferPoolTest {
 
   BufferPool bufferPool;
@@ -27,10 +25,10 @@ public class BufferPoolTest {
   @Test
   public void shouldLinkBuffers() {
     bufferPool = new BufferPool(2, 1, false);
-    Buffer one = new Buffer(1, false);
-    Buffer another = new Buffer(1, false);
-    one.accept(TestMessage.newMessage(0));
-    another.accept(TestMessage.newMessage(0));
+    Buffer<TestMessage> one = new Buffer<>(1, false);
+    Buffer<TestMessage> another = new Buffer<>(1, false);
+    one.accept(newSendingTask(0));
+    another.accept(newSendingTask(0));
 
     bufferPool.release(one);
     bufferPool.release(another);
