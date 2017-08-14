@@ -14,12 +14,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Created by tramchamploo on 2017/5/19.
  * Manages {@link SizeBoundedQueue}'s lifecycle
  */
 class QueueManager {
 
   private final Logger logger = LoggerFactory.getLogger(getClass());
+
+  /** The name of the system property for setting the total queued messages */
+  private static final String KEY_TOTAL_QUEUED = "bufferslayer.total-queued-messages";
+  private static final int totalQueued = Integer.getInteger(KEY_TOTAL_QUEUED, 100_000);
+  private static final MessageCounter messageCounter = MessageCounter.maxOf(totalQueued);
 
   final Map<MessageKey, SizeBoundedQueue> keyToQueue;
   final Map<MessageKey, Long> keyToLastGet;
@@ -77,7 +81,7 @@ class QueueManager {
     try {
       SizeBoundedQueue queue = keyToQueue.get(key);
       if (queue == null) {
-        queue = new SizeBoundedQueue(pendingMaxMessages, overflowStrategy, key);
+        queue = new SizeBoundedQueue(pendingMaxMessages, overflowStrategy, key, messageCounter);
         keyToQueue.put(key, queue);
         onCreate(queue);
         logger.debug("Queue created, key: {}", key);

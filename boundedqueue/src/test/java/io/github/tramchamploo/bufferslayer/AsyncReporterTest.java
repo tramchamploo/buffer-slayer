@@ -15,9 +15,6 @@ import org.jdeferred.Promise;
 import org.junit.After;
 import org.junit.Test;
 
-/**
- * Created by tramchamploo on 2017/3/14.
- */
 public class AsyncReporterTest {
 
   private AsyncReporter<TestMessage, Integer> reporter;

@@ -1,7 +1,6 @@
 package io.github.tramchamploo.bufferslayer;
 
 import java.io.Serializable;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Message which can be sent to reporter, could be a sql statement
@@ -9,12 +8,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public abstract class Message implements Serializable {
 
   protected static final long serialVersionUID = 845870486130911487L;
-
-  /**
-   * Global unique id as key of mapping from message to deferred.
-   */
-  private static final AtomicLong idGenerator = new AtomicLong();
-  public final Long id = idGenerator.incrementAndGet();
 
   public abstract MessageKey asMessageKey();
 
