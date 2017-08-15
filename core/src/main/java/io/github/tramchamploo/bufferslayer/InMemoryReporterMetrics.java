@@ -1,6 +1,7 @@
 package io.github.tramchamploo.bufferslayer;
 
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
+import io.github.tramchamploo.bufferslayer.chmv8.LongAdderV8;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
@@ -18,7 +19,7 @@ public class InMemoryReporterMetrics extends ReporterMetrics {
 
   private static InMemoryReporterMetrics instance;
 
-  final ConcurrentHashMap<MetricKey, AtomicLong> metrics = new ConcurrentHashMap<>();
+  final ConcurrentHashMap<MetricKey, LongAdderV8> metrics = new ConcurrentHashMap<>();
   final ConcurrentHashMap<MessageKey, AtomicLong> queuedMessages = new ConcurrentHashMap<>();
 
   private final Lock lock = new ReentrantLock();
@@ -43,25 +44,26 @@ public class InMemoryReporterMetrics extends ReporterMetrics {
       return;
     }
     while (true) {
-      AtomicLong metric = metrics.get(key);
+      LongAdderV8 metric = metrics.get(key);
+
       if (metric == null) {
         try {
           lock.lock();
           metric = metrics.get(key);
           if (metric == null) {
-            metrics.put(key, new AtomicLong(quantity));
+            metric = new LongAdderV8();
+            metric.add(quantity);
+            metrics.put(key, metric);
             return;
+          } else {
+            continue;
           }
         } finally {
           lock.unlock();
         }
       }
-      while (true) {
-        long prev = metric.get();
-        if (metric.compareAndSet(prev, prev + quantity)) {
-          return;
-        }
-      }
+      metric.add(quantity);
+      return;
     }
   }
 
@@ -76,8 +78,8 @@ public class InMemoryReporterMetrics extends ReporterMetrics {
   }
 
   private long get(MetricKey key) {
-    AtomicLong metric = metrics.get(key);
-    return metric == null ? 0 : metric.get();
+    LongAdderV8 metric = metrics.get(key);
+    return metric == null ? 0 : metric.sum();
   }
 
   @Override
