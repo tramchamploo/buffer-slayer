@@ -26,7 +26,7 @@ public class AsyncReporterBenchmark extends AbstractReporterBenchmark {
   @Override
   protected Reporter getReporter() {
     return AsyncReporter.builder(sender)
-        .pendingMaxMessages(1000000)
+        .pendingMaxMessages(100_000)
         .metrics(metrics)
         .messageTimeout(1000, TimeUnit.NANOSECONDS)
         .build();

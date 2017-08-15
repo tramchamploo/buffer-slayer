@@ -36,7 +36,6 @@ final class SizeBoundedQueue {
   static final int DEFAULT_CAPACITY = 10;
 
   final ReentrantLock lock = new ReentrantLock(false);
-  final Condition notEmpty = lock.newCondition();
   final Condition notFull = lock.newCondition();
 
   final int maxSize;
@@ -45,20 +44,24 @@ final class SizeBoundedQueue {
 
   SendingTask[] elements;
   int count;
+
+  final MessageCounter messageCounter;
+
   int writePos;
   int readPos;
 
-  SizeBoundedQueue(int maxSize, Strategy overflowStrategy, MessageKey key) {
+  SizeBoundedQueue(int maxSize, Strategy overflowStrategy, MessageKey key, MessageCounter messageCounter) {
     int initialCapacity = DEFAULT_CAPACITY > maxSize ? maxSize : DEFAULT_CAPACITY;
     this.elements = new SendingTask[initialCapacity];
     this.maxSize = maxSize;
     this.overflowStrategy = overflowStrategy;
     this.key = key;
+    this.messageCounter = messageCounter;
   }
 
   // Used for testing
   SizeBoundedQueue(int maxSize, Strategy overflowStrategy) {
-    this(maxSize, overflowStrategy, Message.SINGLE_KEY);
+    this(maxSize, overflowStrategy, Message.SINGLE_KEY, MessageCounter.maxOf(50));
   }
 
   /**
@@ -70,7 +73,7 @@ final class SizeBoundedQueue {
     lock.lock();
     try {
       ensureCapacity(count + 1);
-      if (isFull()) {
+      if (isFull() || messageCounter.isMaximum()) {
         switch (overflowStrategy) {
           case DropNew:
             deferred.reject(dropped(DropNew, next));
@@ -78,20 +81,17 @@ final class SizeBoundedQueue {
           case DropTail:
             SendingTask tail = dropTail();
             enqueue(task);
-            deferred.notify(1);
             tail.deferred.reject(dropped(DropTail, tail.message));
             return;
           case DropHead:
             SendingTask head = dropHead();
             enqueue(task);
-            deferred.notify(1);
             head.deferred.reject(dropped(DropHead, head.message));
             return;
           case DropBuffer:
             List<SendingTask> allElements = removeAll();
             doClear();
             enqueue(task);
-            deferred.notify(1);
             rejectAll(allElements, DropBuffer);
             return;
           case Block:
@@ -101,12 +101,10 @@ final class SizeBoundedQueue {
         }
       }
       enqueue(task);
-      deferred.notify(1);
     } finally {
       lock.unlock();
     }
   }
-
 
   private void rejectAll(List<SendingTask> tasks, Strategy overflowStrategy) {
     Object[] messageAndDeferred = SendingTask.unzip(tasks);
@@ -175,7 +173,7 @@ final class SizeBoundedQueue {
 
   private void enqueue(SendingTask next) {
     try {
-      while (isFull()) {
+      while (isFull() || messageCounter.isMaximum()) {
         notFull.await();
       }
       elements[writePos++] = next;
@@ -185,7 +183,8 @@ final class SizeBoundedQueue {
       }
 
       count++;
-      notEmpty.signal(); // alert any drainers
+      messageCounter.increment();
+      next.deferred.notify(1); // notify for benchmark
     } catch (InterruptedException e) {
     }
   }
@@ -213,6 +212,7 @@ final class SizeBoundedQueue {
   @SuppressWarnings("unchecked")
   private int doDrain(Consumer consumer) {
     int drainedCount = 0;
+
     while (drainedCount < count) {
       SendingTask next = elements[readPos];
 
@@ -230,7 +230,10 @@ final class SizeBoundedQueue {
         break;
       }
     }
+
     count -= drainedCount;
+    messageCounter.add(-drainedCount);
+
     for (int i = drainedCount; i > 0 && lock.hasWaiters(notFull); i--) {
       notFull.signal();
     }
@@ -251,7 +254,9 @@ final class SizeBoundedQueue {
 
   private int doClear() {
     int result = count;
+
     count = readPos = writePos = 0;
+    messageCounter.add(-result);
     Arrays.fill(elements, null);
     for (int i = result; i > 0 && lock.hasWaiters(notFull); i--) {
       notFull.signal();

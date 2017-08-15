@@ -9,7 +9,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * Created by tramchamploo on 2017/5/25.
  * <p>Flush threads should block when no pending queue has more elements
  * than {@code bufferedMaxMessages}.
  */
