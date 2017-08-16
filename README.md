@@ -29,7 +29,7 @@ Updates directly goes to the reporter and returns a `Promise` immediately.
 <dependency>
   <groupId>io.github.tramchamploo</groupId>
   <artifactId>bufferslayer-spring-jdbc</artifactId>
-  <version>1.3.10</version>
+  <version>1.3.11</version>
 </dependency>
 ```
 
@@ -38,7 +38,7 @@ For **native** implementation:
 <dependency>
   <groupId>io.github.tramchamploo</groupId>
   <artifactId>bufferslayer-boundedqueue</artifactId>
-  <version>1.3.10</version>
+  <version>1.3.11</version>
 </dependency>
 ```
 
@@ -47,7 +47,7 @@ For **rx-java** implementation:
 <dependency>
   <groupId>io.github.tramchamploo</groupId>
   <artifactId>bufferslayer-rx</artifactId>
-  <version>1.3.10</version>
+  <version>1.3.11</version>
 </dependency>
 ```
 
