@@ -10,7 +10,7 @@ abstract class MessageCounter {
 
   static MessageCounter maxOf(int maxMessages) {
     Preconditions.checkArgument(maxMessages > 0, "maxMessages should be greater than 0.");
-    int result = Math.min(Integer.MAX_VALUE, maxMessages);
+    int result = Math.min(1_000_000, maxMessages);
     return new DefaultMessageCounter(result);
   }
 
