@@ -6,7 +6,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-public class FakeSender implements Sender<TestMessage, Integer> {
+public class FakeSender implements SyncSender<TestMessage, Integer> {
 
   private AtomicBoolean closed = new AtomicBoolean(false);
   final List<TestMessage> sent = new CopyOnWriteArrayList<>();

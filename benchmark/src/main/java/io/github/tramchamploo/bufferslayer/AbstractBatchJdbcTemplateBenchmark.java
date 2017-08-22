@@ -1,5 +1,7 @@
 package io.github.tramchamploo.bufferslayer;
 
+import static io.github.tramchamploo.bufferslayer.TestUtil.propertyOr;
+
 import java.beans.PropertyVetoException;
 import java.util.Date;
 import java.util.concurrent.ThreadLocalRandom;
@@ -25,7 +27,7 @@ public abstract class AbstractBatchJdbcTemplateBenchmark {
   private DriverManagerDataSource dataSource;
   private BatchJdbcTemplate batch;
   private JdbcTemplate unbatch;
-  private Reporter<Sql, Integer> reporter;
+  private Reporter<SQL, Integer> reporter;
   private static SenderProxy proxy;
   private static AtomicLong counter = new AtomicLong();
 
@@ -35,16 +37,12 @@ public abstract class AbstractBatchJdbcTemplateBenchmark {
   private static final String TRUNCATE_TABLE = "TRUNCATE TABLE test.benchmark";
   private static final String INSERTION = "INSERT INTO test.benchmark(data, time) VALUES(?, ?)";
 
-  static String propertyOr(String key, String fallback) {
-    return System.getProperty(key, fallback);
-  }
-
-  protected abstract Reporter<Sql, Integer> reporter(Sender<Sql, Integer> sender);
+  protected abstract Reporter<SQL, Integer> reporter(Sender<SQL, Integer> sender);
 
   @Setup
   public void setup() throws PropertyVetoException {
     dataSource = new DriverManagerDataSource();
-    dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+    dataSource.setDriverClassName("com.mysql.jdbc.Driver");
     dataSource.setUrl(propertyOr("jdbcUrl", "jdbc:mysql://127.0.0.1:3306?useSSL=false"));
     dataSource.setUsername(propertyOr("username", "root"));
     dataSource.setPassword(propertyOr("password", "root"));
@@ -90,7 +88,7 @@ public abstract class AbstractBatchJdbcTemplateBenchmark {
 
     @Setup(Level.Iteration)
     public void lag() throws InterruptedException {
-      TimeUnit.SECONDS.sleep(3);
+      TimeUnit.SECONDS.sleep(1);
     }
   }
 

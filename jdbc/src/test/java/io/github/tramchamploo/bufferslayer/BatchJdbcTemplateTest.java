@@ -33,7 +33,7 @@ public class BatchJdbcTemplateTest {
   private static DriverManagerDataSource dataSource;
   private BatchJdbcTemplate batchJdbcTemplate;
   private JdbcTemplate underlying;
-  private AsyncReporter<Sql, Integer> reporter;
+  private AsyncReporter<SQL, Integer> reporter;
 
   private static final String CREATE_TABLE = "CREATE TABLE IF NOT EXISTS test(id INT PRIMARY KEY AUTO_INCREMENT, data VARCHAR(32), time TIMESTAMP);";
   private static final String TRUNCATE_TABLE = "TRUNCATE TABLE test;";

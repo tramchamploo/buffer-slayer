@@ -2,10 +2,10 @@ package io.github.tramchamploo.bufferslayer;
 
 import java.util.concurrent.TimeUnit;
 
-public class RxReporterTimeUsedComparison extends AbstractTimeUsedComparison {
+public class RxVertxTimeUsedComparison extends AbstractVertxTimeUsedComparison {
 
   public static void main(String[] args) throws Exception {
-    new RxReporterTimeUsedComparison().run();
+    new RxVertxTimeUsedComparison().run();
   }
 
   @Override

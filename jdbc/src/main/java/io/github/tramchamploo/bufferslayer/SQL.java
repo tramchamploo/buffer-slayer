@@ -10,10 +10,9 @@ import org.springframework.jdbc.core.ArgumentTypePreparedStatementSetter;
 import org.springframework.jdbc.core.PreparedStatementSetter;
 
 /**
- * Created by tramchamploo on 2017/2/27.
  * Represent sql to be sent
  */
-public final class Sql extends Message {
+public final class SQL extends Message {
 
   final String sql;
   transient final PreparedStatementSetter statementSetter;
@@ -24,7 +23,7 @@ public final class Sql extends Message {
     return new Builder();
   }
 
-  Sql(Builder builder) {
+  SQL(Builder builder) {
     this.sql = builder.sql;
     this.statementSetter = builder.preparedStatementSetter;
     this.args = builder.args;
@@ -109,9 +108,9 @@ public final class Sql extends Message {
       return this;
     }
 
-    Sql build() {
-      Preconditions.checkArgument(sql != null, "Sql must not be null.");
-      return new Sql(this);
+    SQL build() {
+      Preconditions.checkArgument(sql != null, "SQL must not be null.");
+      return new SQL(this);
     }
   }
 
