@@ -4,8 +4,6 @@ import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.chmv8.LongAdderV8;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Metrics that keeps data in memory
@@ -21,8 +19,6 @@ public class InMemoryReporterMetrics extends ReporterMetrics {
 
   final ConcurrentHashMap<MetricKey, LongAdderV8> metrics = new ConcurrentHashMap<>();
   final ConcurrentHashMap<MessageKey, AtomicLong> queuedMessages = new ConcurrentHashMap<>();
-
-  private final Lock lock = new ReentrantLock();
 
   private InMemoryReporterMetrics(ReporterMetricsExporter exporter) {
     startExporter(exporter);
@@ -40,31 +36,16 @@ public class InMemoryReporterMetrics extends ReporterMetrics {
   }
 
   private void increment(MetricKey key, int quantity) {
-    if (quantity == 0) {
-      return;
-    }
-    while (true) {
-      LongAdderV8 metric = metrics.get(key);
+    if (quantity == 0) return;
 
-      if (metric == null) {
-        try {
-          lock.lock();
-          metric = metrics.get(key);
-          if (metric == null) {
-            metric = new LongAdderV8();
-            metric.add(quantity);
-            metrics.put(key, metric);
-            return;
-          } else {
-            continue;
-          }
-        } finally {
-          lock.unlock();
-        }
-      }
+    LongAdderV8 metric = metrics.get(key);
+    if (metric == null) {
+      metric = new LongAdderV8();
       metric.add(quantity);
-      return;
+      metric = metrics.putIfAbsent(key, metric);
+      if (metric == null) return;
     }
+    metric.add(quantity);
   }
 
   @Override
@@ -102,21 +83,13 @@ public class InMemoryReporterMetrics extends ReporterMetrics {
   }
 
   @Override
-  public void updateQueuedMessages(MessageKey key, int quantity) {
+  public void updateQueuedMessages(MessageKey key, int update) {
     AtomicLong metric = queuedMessages.get(key);
     if (metric == null) {
-      try {
-        lock.lock();
-        metric = queuedMessages.get(key);
-        if (metric == null) {
-          queuedMessages.put(key, new AtomicLong(quantity));
-          return;
-        }
-      } finally {
-        lock.unlock();
-      }
+      metric = queuedMessages.putIfAbsent(key, new AtomicLong(update));
+      if (metric == null) return;
     }
-    metric.set(quantity);
+    metric.set(update);
   }
 
   @Override
