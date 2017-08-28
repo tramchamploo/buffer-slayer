@@ -90,7 +90,7 @@ public class SizeBoundedQueueBenchmark {
 
   @Setup
   public void setup() {
-    q = new SizeBoundedQueue(10000, OverflowStrategy.block, Message.SINGLE_KEY, MessageCounter.maxOf(50));
+    q = new SizeBoundedQueue(10000, OverflowStrategy.block, Message.SINGLE_KEY);
   }
 
   @TearDown(Level.Iteration)

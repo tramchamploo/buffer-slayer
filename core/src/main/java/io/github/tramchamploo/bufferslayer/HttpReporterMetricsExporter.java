@@ -9,7 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Created by tramchamploo on 2017/3/16.
  * A simple metrics viewer on port 15090.
  * If port already in use, pick a unused one randomly.
  */

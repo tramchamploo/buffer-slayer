@@ -12,7 +12,7 @@ import org.openjdk.jmh.annotations.State;
 @SuppressWarnings("unchecked")
 public abstract class AbstractReporterBenchmark {
 
-  static Sender sender = new NoopSender();
+  static NoopSender<Message> sender = new NoopSender<>();
   static InMemoryReporterMetrics metrics =
       InMemoryReporterMetrics.instance(ReporterMetricsExporter.NOOP_EXPORTER);
 

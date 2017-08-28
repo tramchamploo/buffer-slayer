@@ -44,25 +44,6 @@ public class SizeBoundedQueueTest {
   }
 
   @Test
-  public void offer_failsWhenExceedsTotalMaxMessages() {
-    // total max messages is 50
-    SizeBoundedQueue queue = new SizeBoundedQueue(51, dropNew);
-
-    AtomicBoolean success = new AtomicBoolean(true);
-    for (int i = 0; i < 50; i++) {
-      Message next = newMessage(i);
-      queue.offer(next, new DeferredObject<>());
-      assertTrue(success.get());
-    }
-
-    Message shouldFail = newMessage(0);
-    Deferred<Object, MessageDroppedException, Integer> deferred = new DeferredObject<>();
-    deferred.promise().fail(obj -> success.set(false));
-    queue.offer(shouldFail, deferred);
-    assertFalse(success.get());
-  }
-
-  @Test
   public void offer_updatesCount() {
     for (int i = 0; i < queue.maxSize; i++) {
       Message next = newMessage(i);
@@ -172,25 +153,6 @@ public class SizeBoundedQueueTest {
     CountDownLatch countDown = new CountDownLatch(1);
     new Thread(() -> {
       TestMessage shouldBlock = newMessage(10);
-      queue.offer(shouldBlock, new DeferredObject<>());
-      countDown.countDown();
-    }).start();
-    assertFalse(countDown.await(10, TimeUnit.MILLISECONDS));
-    queue.drainTo(next -> true);
-    assertTrue(countDown.await(10, TimeUnit.MILLISECONDS));
-  }
-
-  @Test
-  public void blockCallerWhenExceedsTotalMaxMessages() throws InterruptedException {
-    SizeBoundedQueue queue = new SizeBoundedQueue(51, OverflowStrategy.block);
-    for (int i = 0; i < 50; i++) {
-      TestMessage next = newMessage(i);
-      queue.offer(next, new DeferredObject<>());
-    }
-
-    CountDownLatch countDown = new CountDownLatch(1);
-    new Thread(() -> {
-      TestMessage shouldBlock = newMessage(51);
       queue.offer(shouldBlock, new DeferredObject<>());
       countDown.countDown();
     }).start();

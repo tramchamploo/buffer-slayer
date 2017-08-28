@@ -305,4 +305,46 @@ public class AsyncReporterTest {
     reporter.report(newMessage(0));
     assertEquals(1, reporter.flushers.size());
   }
+
+  @Test
+  public void waitWhenExceedTotalMaxMessages() {
+    FakeSender sender = new FakeSender();
+
+    reporter = AsyncReporter.builder(sender)
+        .sharedSenderThreads(1)
+        .pendingMaxMessages(10)
+        .totalQueuedMessages(11)
+        .bufferedMaxMessages(1)
+        .messageTimeout(0, TimeUnit.MICROSECONDS)
+        .metrics(metrics)
+        .build();
+    AsyncReporter<TestMessage, Integer> reporter2 = AsyncReporter.builder(sender)
+        .pendingMaxMessages(10)
+        .totalQueuedMessages(11)
+        .bufferedMaxMessages(1)
+        .messageTimeout(0, TimeUnit.MICROSECONDS)
+        .metrics(metrics)
+        .build();
+
+    for (int i = 0; i < 10; i++) {
+      reporter.report(newMessage(0));
+    }
+    reporter.flush();
+    for (int i = 0; i < 3; i++) {
+      reporter2.report(newMessage(1));
+    }
+    reporter2.flush();
+
+    new Thread(() -> {
+      try {
+        Thread.sleep(200);
+        reporter2.flush();
+      } catch (InterruptedException e) {
+      }
+    }).start();
+    long start = System.currentTimeMillis();
+    reporter2.report(newMessage(2));
+    long used = System.currentTimeMillis() - start;
+    assertTrue(used > 200);
+  }
 }
