@@ -10,6 +10,7 @@ public class AsyncReporterProperties extends AbstractReporterProperties<AsyncRep
   private int flushThreads = 1;
   private int timerThreads = AsyncReporter.DEFAULT_TIMER_THREADS;
   private boolean singleKey = false;
+  private int totalQueuedMessages = 100_000;
 
   public int getSharedSenderThreads() {
     return sharedSenderThreads;
@@ -56,6 +57,15 @@ public class AsyncReporterProperties extends AbstractReporterProperties<AsyncRep
     return singleKey;
   }
 
+  public int getTotalQueuedMessages() {
+    return totalQueuedMessages;
+  }
+
+  public AsyncReporterProperties setTotalQueuedMessages(int totalQueuedMessages) {
+    this.totalQueuedMessages = totalQueuedMessages;
+    return this;
+  }
+
   public Builder toBuilder() {
     Builder builder = new Builder<>(sender).sharedSenderThreads(sharedSenderThreads)
                                            .messageTimeout(messageTimeoutNanos, TimeUnit.NANOSECONDS)
@@ -65,7 +75,8 @@ public class AsyncReporterProperties extends AbstractReporterProperties<AsyncRep
                                            .bufferedMaxMessages(bufferedMaxMessages)
                                            .pendingMaxMessages(pendingMaxMessages)
                                            .singleKey(singleKey)
-                                           .overflowStrategy(OverflowStrategy.create(overflowStrategy));
+                                           .overflowStrategy(OverflowStrategy.create(overflowStrategy))
+                                           .totalQueuedMessages(totalQueuedMessages);
     if (metrics.equalsIgnoreCase("inmemory")) {
       builder.metrics(InMemoryReporterMetrics.instance(ReporterMetricsExporter.of(metricsExporter)));
     }

@@ -44,24 +44,20 @@ final class SizeBoundedQueue {
 
   SendingTask[] elements;
   int count;
-
-  final MessageCounter messageCounter;
-
   int writePos;
   int readPos;
 
-  SizeBoundedQueue(int maxSize, Strategy overflowStrategy, MessageKey key, MessageCounter messageCounter) {
+  SizeBoundedQueue(int maxSize, Strategy overflowStrategy, MessageKey key) {
     int initialCapacity = DEFAULT_CAPACITY > maxSize ? maxSize : DEFAULT_CAPACITY;
     this.elements = new SendingTask[initialCapacity];
     this.maxSize = maxSize;
     this.overflowStrategy = overflowStrategy;
     this.key = key;
-    this.messageCounter = messageCounter;
   }
 
   // Used for testing
   SizeBoundedQueue(int maxSize, Strategy overflowStrategy) {
-    this(maxSize, overflowStrategy, Message.SINGLE_KEY, MessageCounter.maxOf(50));
+    this(maxSize, overflowStrategy, Message.SINGLE_KEY);
   }
 
   /**
@@ -73,7 +69,7 @@ final class SizeBoundedQueue {
     lock.lock();
     try {
       ensureCapacity(count + 1);
-      if (isFull() || messageCounter.isMaximum()) {
+      if (isFull()) {
         switch (overflowStrategy) {
           case DropNew:
             deferred.reject(dropped(DropNew, next));
@@ -173,7 +169,7 @@ final class SizeBoundedQueue {
 
   private void enqueue(SendingTask next) {
     try {
-      while (isFull() || messageCounter.isMaximum()) {
+      while (isFull()) {
         notFull.await();
       }
       elements[writePos++] = next;
@@ -183,7 +179,6 @@ final class SizeBoundedQueue {
       }
 
       count++;
-      messageCounter.increment();
       next.deferred.notify(1); // notify for benchmark
     } catch (InterruptedException e) {
     }
@@ -232,8 +227,6 @@ final class SizeBoundedQueue {
     }
 
     count -= drainedCount;
-    messageCounter.add(-drainedCount);
-
     for (int i = drainedCount; i > 0 && lock.hasWaiters(notFull); i--) {
       notFull.signal();
     }
@@ -256,7 +249,6 @@ final class SizeBoundedQueue {
     int result = count;
 
     count = readPos = writePos = 0;
-    messageCounter.add(-result);
     Arrays.fill(elements, null);
     for (int i = result; i > 0 && lock.hasWaiters(notFull); i--) {
       notFull.signal();

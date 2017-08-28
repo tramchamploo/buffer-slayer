@@ -54,10 +54,12 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   CountDownLatch close;
   ScheduledExecutorService scheduler;
   BufferPool bufferPool;
+  final MemoryLimiter memoryLimiter;
 
   AsyncReporter(Builder<M, R> builder) {
     this.sender = toAsyncSender(builder);
     this.metrics = builder.metrics;
+    this.memoryLimiter = MemoryLimiter.maxOf(builder.totalQueuedMessages, metrics);
     this.messageTimeoutNanos = builder.messageTimeoutNanos;
     this.bufferedMaxMessages = builder.bufferedMaxMessages;
     this.singleKey = builder.singleKey;
@@ -93,6 +95,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     int timerThreads = DEFAULT_TIMER_THREADS;
     long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
     boolean singleKey = false;
+    int totalQueuedMessages = 100_000;
 
     Builder(Sender<M, R> sender) {
       super(sender);
@@ -127,7 +130,14 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
       return this;
     }
 
+    public Builder<M, R> totalQueuedMessages(int totalQueuedMessages) {
+      checkArgument(totalQueuedMessages >= 0, "totalQueuedMessages >= 0: %s", totalQueuedMessages);
+      this.totalQueuedMessages = totalQueuedMessages;
+      return this;
+    }
+
     public AsyncReporter<M, R> build() {
+      checkArgument(totalQueuedMessages >= pendingMaxMessages, "totalQueuedMessages >= pendingMaxMessages: %s", totalQueuedMessages);
       return new AsyncReporter<>(this);
     }
   }
@@ -173,6 +183,8 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
         started.compareAndSet(false, true)) {
       startFlushThreads();
     }
+
+    memoryLimiter.waitWhenMaximum();
     // If singleKey is true, ignore original message key.
     Message.MessageKey key = message.asMessageKey();
     key = singleKey ? Message.SINGLE_KEY : key;
@@ -232,6 +244,8 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
       }
       // Update metrics
       metrics.updateQueuedMessages(pending.key, pending.count);
+      if (!memoryLimiter.isMaximum()) memoryLimiter.signalAll();
+
       final List<SendingTask<M>> tasks = buffer.drain();
       Promise<MultipleResults, OneReject, MasterProgress> promise = sender.send(tasks);
       promise.fail(loggingCallback());
