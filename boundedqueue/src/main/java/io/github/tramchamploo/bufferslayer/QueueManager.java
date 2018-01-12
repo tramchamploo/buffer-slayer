@@ -4,12 +4,11 @@ import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.Map;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,8 +19,7 @@ class QueueManager {
 
   private final Logger logger = LoggerFactory.getLogger(getClass());
 
-  final Map<MessageKey, SizeBoundedQueue> keyToQueue;
-  final Map<MessageKey, Long> keyToLastGet;
+  final ConcurrentMap<MessageKey, SizeBoundedQueue> keyToQueue;
 
   final int pendingMaxMessages;
   final Strategy overflowStrategy;
@@ -29,13 +27,10 @@ class QueueManager {
 
   private Callback createCallback;
 
-  private final Lock lock = new ReentrantLock();
-
   QueueManager(int pendingMaxMessages,
                Strategy overflowStrategy,
                long pendingKeepaliveNanos) {
-    this.keyToQueue = new HashMap<>();
-    this.keyToLastGet = new HashMap<>();
+    this.keyToQueue = new ConcurrentHashMap<>();
 
     this.pendingMaxMessages = pendingMaxMessages;
     this.overflowStrategy = overflowStrategy;
@@ -57,12 +52,7 @@ class QueueManager {
    * @return the queue if existed otherwise null
    */
   SizeBoundedQueue get(MessageKey key) {
-    lock.lock();
-    try {
-      return keyToQueue.get(key);
-    } finally {
-      lock.unlock();
-    }
+    return keyToQueue.get(key);
   }
 
   /**
@@ -72,20 +62,21 @@ class QueueManager {
    * @return the queue
    */
   SizeBoundedQueue getOrCreate(MessageKey key) {
-    lock.lock();
-    try {
-      SizeBoundedQueue queue = keyToQueue.get(key);
-      if (queue == null) {
-        queue = new SizeBoundedQueue(pendingMaxMessages, overflowStrategy, key);
-        keyToQueue.put(key, queue);
+    SizeBoundedQueue queue = keyToQueue.get(key);
+    if (queue == null) {
+      queue = new SizeBoundedQueue(pendingMaxMessages, overflowStrategy, key);
+      SizeBoundedQueue prev = keyToQueue.putIfAbsent(key, queue);
+      if (prev == null) {
         onCreate(queue);
-        logger.debug("Queue created, key: {}", key);
+        if (logger.isDebugEnabled()) {
+          logger.debug("Queue created, key: {}", key);
+        }
+      } else {
+        queue = prev;
       }
-      keyToLastGet.put(key, now());
-      return queue;
-    } finally {
-      lock.unlock();
     }
+    key.recordAccess();
+    return queue;
   }
 
   private void onCreate(SizeBoundedQueue queue) {
@@ -106,58 +97,35 @@ class QueueManager {
   LinkedList<MessageKey> shrink() {
     LinkedList<MessageKey> result = new LinkedList<>();
 
-    lock.lock();
-    try {
-      for (Iterator<MessageKey> iter = keyToLastGet.keySet().iterator(); iter.hasNext(); ) {
-        MessageKey next = iter.next();
-        if (now() - getOrDefault(keyToLastGet, next, now()) > pendingKeepaliveNanos) {
-          SizeBoundedQueue q = keyToQueue.get(next);
-          if (q == null || q.count > 0) continue;
+      Iterator<Entry<MessageKey, SizeBoundedQueue>> iter;
+      for (iter = keyToQueue.entrySet().iterator(); iter.hasNext(); ) {
+        Entry<MessageKey, SizeBoundedQueue> entry = iter.next();
+        MessageKey key = entry.getKey();
+        SizeBoundedQueue q = entry.getValue();
 
+        if (now() - key.lastAccessNanos() > pendingKeepaliveNanos) {
+          if (q.count > 0) continue;
           iter.remove();
-          keyToQueue.remove(next);
-          result.add(next);
+          result.add(key);
         }
       }
-    } finally {
-      lock.unlock();
-    }
-    if (!result.isEmpty()) {
+    if (logger.isDebugEnabled() && !result.isEmpty()) {
       logger.debug("Timeout queues removed, keys: {}", result);
     }
     return result;
-  }
-
-  static Long getOrDefault(Map<MessageKey, Long> map, MessageKey key, Long defaultValue) {
-    Long v;
-    return (((v = map.get(key)) != null) || map.containsKey(key))
-        ? v
-        : defaultValue;
   }
 
   /**
    * Clear everything
    */
   void clear() {
-    lock.lock();
-    try {
-      keyToQueue.clear();
-      keyToLastGet.clear();
-    } finally {
-      lock.unlock();
-    }
+    keyToQueue.clear();
   }
 
   /**
    * Get all queues
    */
   Collection<SizeBoundedQueue> elements() {
-    lock.lock();
-    try {
-      // return a copy here to avoid modification while traversing
-      return new ArrayList<>(keyToQueue.values());
-    } finally {
-      lock.unlock();
-    }
+    return new ArrayList<>(keyToQueue.values());
   }
 }

@@ -330,11 +330,12 @@ public class AsyncReporterTest {
       reporter.report(newMessage(0));
     }
     reporter.flush();
+    // 9 messages queued here
     for (int i = 0; i < 3; i++) {
       reporter2.report(newMessage(1));
     }
     reporter2.flush();
-
+    // 11 messages queued here
     new Thread(() -> {
       try {
         Thread.sleep(200);

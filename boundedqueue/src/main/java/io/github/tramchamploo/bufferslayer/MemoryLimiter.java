@@ -12,9 +12,11 @@ import org.slf4j.LoggerFactory;
  */
 abstract class MemoryLimiter {
 
+  private static final int MAX_TOTAL_MESSGAES = 1_000_000;
+
   static MemoryLimiter maxOf(int maxMessages, ReporterMetrics metrics) {
     Preconditions.checkArgument(maxMessages > 0, "maxMessages should be greater than 0.");
-    int result = Math.min(1_000_000, maxMessages);
+    int result = Math.min(MAX_TOTAL_MESSGAES, maxMessages);
     return new DefaultMemoryLimiter(result, metrics);
   }
 

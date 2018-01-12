@@ -33,18 +33,18 @@
     <maven.compiler.testSource>1.8</maven.compiler.testSource>
     <maven.compiler.testTarget>1.8</maven.compiler.testTarget>
 
-    <maven-compiler-plugin.version>3.6.0</maven-compiler-plugin.version>
+    <maven-compiler-plugin.version>3.7.0</maven-compiler-plugin.version>
     <maven-install-plugin.version>2.5.2</maven-install-plugin.version>
     <maven-source-plugin.version>3.0.1</maven-source-plugin.version>
     <maven-javadoc-plugin.version>2.10.4</maven-javadoc-plugin.version>
     <maven-jar-plugin.version>3.0.2</maven-jar-plugin.version>
     <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
-    <maven-shade-plugin.version>2.4.3</maven-shade-plugin.version>
+    <maven-shade-plugin.version>3.1.0</maven-shade-plugin.version>
     <maven-gpg-plugin.version>1.6</maven-gpg-plugin.version>
-    <maven-dependency-plugin>3.0.1</maven-dependency-plugin>
-    <maven-surefire-plugin>2.20</maven-surefire-plugin>
+    <maven-dependency-plugin>3.0.2</maven-dependency-plugin>
+    <maven-surefire-plugin>2.20.1</maven-surefire-plugin>
 
-    <slf4j.version>1.7.12</slf4j.version>
+    <slf4j.version>1.7.25</slf4j.version>
   </properties>
 
   <name>buffer-slayer</name>
@@ -118,7 +118,7 @@
       <dependency>
         <groupId>org.springframework</groupId>
         <artifactId>spring-jdbc</artifactId>
-        <version>4.3.8.RELEASE</version>
+        <version>4.3.13.RELEASE</version>
       </dependency>
 
       <dependency>
@@ -148,7 +148,7 @@
       <dependency>
         <groupId>ch.qos.logback</groupId>
         <artifactId>logback-classic</artifactId>
-        <version>1.2.1</version>
+        <version>1.2.3</version>
       </dependency>
 
       <dependency>
@@ -160,13 +160,13 @@
       <dependency>
         <groupId>mysql</groupId>
         <artifactId>mysql-connector-java</artifactId>
-        <version>6.0.6</version>
+        <version>5.1.45</version>
       </dependency>
 
       <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <version>1.4.194</version>
+        <version>1.4.196</version>
       </dependency>
 
       <dependency>
