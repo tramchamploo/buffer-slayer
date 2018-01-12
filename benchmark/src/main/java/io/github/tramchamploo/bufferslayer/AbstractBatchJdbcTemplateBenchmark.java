@@ -44,7 +44,7 @@ public abstract class AbstractBatchJdbcTemplateBenchmark {
   @Setup
   public void setup() throws PropertyVetoException {
     dataSource = new DriverManagerDataSource();
-    dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+    dataSource.setDriverClassName("com.mysql.jdbc.Driver");
     dataSource.setUrl(propertyOr("jdbcUrl", "jdbc:mysql://127.0.0.1:3306?useSSL=false"));
     dataSource.setUsername(propertyOr("username", "root"));
     dataSource.setPassword(propertyOr("password", "root"));

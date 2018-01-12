@@ -71,6 +71,8 @@ class QueueManager {
         if (logger.isDebugEnabled()) {
           logger.debug("Queue created, key: {}", key);
         }
+      } else {
+        queue = prev;
       }
     }
     key.recordAccess();
