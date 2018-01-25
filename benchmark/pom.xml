@@ -10,7 +10,7 @@
   <artifactId>bufferslayer-benchmark</artifactId>
 
   <properties>
-    <jmh.version>1.19</jmh.version>
+    <jmh.version>1.20</jmh.version>
   </properties>
 
   <dependencies>

@@ -3,15 +3,15 @@ package io.github.tramchamploo.bufferslayer;
 import static io.github.tramchamploo.bufferslayer.TestMessage.newMessage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import java.io.IOException;
+import io.github.tramchamploo.bufferslayer.internal.MessageFuture;
 import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
-import org.jdeferred.Promise;
 import org.junit.After;
 import org.junit.Test;
 
@@ -35,12 +35,12 @@ public class AsyncReporterTest {
     reporter = AsyncReporter.builder(sender)
         .pendingMaxMessages(2)
         .bufferedMaxMessages(2)
-        .messageTimeout(10, TimeUnit.MILLISECONDS)
+        .messageTimeout(50, TimeUnit.MILLISECONDS)
         .build();
     reporter.report(newMessage(0));
 
-    assertFalse(countDown.await(5, TimeUnit.MILLISECONDS));
-    assertTrue(countDown.await(30, TimeUnit.MILLISECONDS));
+    assertFalse(countDown.await(20, TimeUnit.MILLISECONDS));
+    assertTrue(countDown.await(35, TimeUnit.MILLISECONDS));
     assertEquals(0, sender.sent.get(0).key);
   }
 
@@ -73,7 +73,7 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void differentMessagesHaveDifferentPendingQueue() throws InterruptedException {
+  public void differentMessagesHaveDifferentPendingQueue() {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
@@ -88,7 +88,7 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void singleKey_differentMessagesShareSamePendingQueue() throws InterruptedException {
+  public void singleKey_differentMessagesShareSamePendingQueue() {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
@@ -104,7 +104,7 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void sameMessagesHaveShareSamePendingQueue() throws InterruptedException {
+  public void sameMessagesHaveShareSamePendingQueue() {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
@@ -119,7 +119,7 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void dropWhenExceedsMaxPending() throws InterruptedException {
+  public void dropWhenExceedsMaxPending() {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
@@ -136,7 +136,7 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void incrementMetricsAfterReport() throws InterruptedException {
+  public void incrementMetricsAfterReport() {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
@@ -152,7 +152,7 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void flushIncrementMetrics() throws InterruptedException {
+  public void flushDecrementMetrics() {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
@@ -171,7 +171,7 @@ public class AsyncReporterTest {
     assertEquals(0, metrics.queuedMessages());
   }
 
-  @Test
+ @Test
   public void waitWhenClose() throws InterruptedException {
     FakeSender sender = new FakeSender();
 
@@ -200,7 +200,7 @@ public class AsyncReporterTest {
     assertEquals(1, sender.sent.size());
   }
 
-  @Test
+ @Test
   public void dropWhenSenderClosed() {
     FakeSender sender = new FakeSender();
 
@@ -216,9 +216,8 @@ public class AsyncReporterTest {
     assertEquals(1, metrics.messagesDropped());
   }
 
-
   @Test
-  public void dropWhenReporterClosed() throws IOException {
+  public void dropWhenReporterClosed() {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
@@ -253,7 +252,7 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void closeShouldRemoveMetrics() throws InterruptedException {
+  public void closeShouldRemoveMetrics() {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
@@ -261,16 +260,10 @@ public class AsyncReporterTest {
         .messageTimeout(0, TimeUnit.MILLISECONDS)
         .build();
 
-    CountDownLatch countDown = new CountDownLatch(1);
-    Promise<Integer, MessageDroppedException, Integer> promise = reporter.report(
-        newMessage(0));
-    promise.done(d -> {
-      assertEquals(1, metrics.queuedMessages.size());
-      countDown.countDown();
-    });
+    reporter.report(newMessage(0));
     reporter.flush();
-    countDown.await();
 
+    assertEquals(1, metrics.queuedMessages.size());
     reporter.close();
     assertEquals(0, metrics.queuedMessages.size());
   }
@@ -282,24 +275,24 @@ public class AsyncReporterTest {
     reporter = AsyncReporter.builder(sender)
         .metrics(metrics)
         .messageTimeout(0, TimeUnit.MILLISECONDS)
-        .pendingKeepalive(10, TimeUnit.MILLISECONDS)
+        .pendingKeepalive(50, TimeUnit.MILLISECONDS)
         .build();
 
     reporter.report(newMessage(0));
     reporter.flush();
     assertEquals(1, metrics.queuedMessages.size());
 
-    Thread.sleep(10);
+    Thread.sleep(50);
     reporter.flush();
     assertEquals(0, metrics.queuedMessages.size());
   }
 
   @Test
-  public void lazyInitFlushThreads() throws InterruptedException {
+  public void lazyInitFlushThreads() {
     FakeSender sender = new FakeSender();
     reporter = AsyncReporter.builder(sender).flushThreads(1).build();
 
-    assertEquals(0, reporter.flushers.size());
+    assertNull(reporter.flushers);
     reporter.report(newMessage(0));
     assertEquals(1, reporter.flushers.size());
     reporter.report(newMessage(0));
@@ -311,7 +304,6 @@ public class AsyncReporterTest {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
-        .sharedSenderThreads(1)
         .pendingMaxMessages(10)
         .totalQueuedMessages(11)
         .bufferedMaxMessages(1)

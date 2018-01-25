@@ -8,9 +8,6 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Created by tramchamploo on 2017/3/16.
- */
 public class LogReporterMetricsExporter extends ReporterMetricsExporter {
 
   private static final Logger logger = LoggerFactory.getLogger(LogReporterMetricsExporter.class);
@@ -24,7 +21,7 @@ public class LogReporterMetricsExporter extends ReporterMetricsExporter {
     executor.scheduleAtFixedRate(new Runnable() {
       @Override
       public void run() {
-        logger.info("Messages: {}\nMessagesDropped: {}\nQueuedMessages: {}",
+        logger.info("Messages: {}\tMessagesDropped: {}\tQueuedMessages: {}",
             metrics.messages(), metrics.messagesDropped(), metrics.queuedMessages());
       }
     }, DELAY, DELAY, TimeUnit.SECONDS);

@@ -6,9 +6,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-/**
- * Created by tramchamploo on 2017/4/18.
- */
 public class OverflowStrategyTest {
 
   @Rule

@@ -8,13 +8,13 @@ import static io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy.Drop
 
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
-import io.github.tramchamploo.bufferslayer.internal.SendingTask;
+import io.github.tramchamploo.bufferslayer.internal.MessagePromise;
+import io.github.tramchamploo.bufferslayer.internal.Promises;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import org.jdeferred.Deferred;
 
 /**
  * Adapted from zipkin
@@ -25,31 +25,34 @@ import org.jdeferred.Deferred;
 @SuppressWarnings("unchecked")
 final class SizeBoundedQueue {
 
-  interface Consumer<M extends Message> {
+  interface Consumer {
 
     /**
      * Returns true if it accepted the next element
      */
-    boolean accept(SendingTask<M> next);
+    boolean accept(MessagePromise next);
   }
 
-  static final int DEFAULT_CAPACITY = 10;
+  private static final int DEFAULT_CAPACITY = 10;
 
-  final ReentrantLock lock = new ReentrantLock(false);
-  final Condition notFull = lock.newCondition();
+  private final ReentrantLock lock = new ReentrantLock(false);
+  private final Condition notFull = lock.newCondition();
 
+  private final Strategy overflowStrategy;
   final int maxSize;
-  final Strategy overflowStrategy;
   final MessageKey key;
 
-  SendingTask[] elements;
+  private MessagePromise[] elements;
+  private int writePos;
+  private int readPos;
   int count;
-  int writePos;
-  int readPos;
+
+  // Set promise success if true, only used in benchmark
+  private boolean _benchmark = false;
 
   SizeBoundedQueue(int maxSize, Strategy overflowStrategy, MessageKey key) {
     int initialCapacity = DEFAULT_CAPACITY > maxSize ? maxSize : DEFAULT_CAPACITY;
-    this.elements = new SendingTask[initialCapacity];
+    this.elements = new MessagePromise[initialCapacity];
     this.maxSize = maxSize;
     this.overflowStrategy = overflowStrategy;
     this.key = key;
@@ -64,31 +67,32 @@ final class SizeBoundedQueue {
    * Notify deferred if the element could be added or reject if it could not due to its
    * {@link OverflowStrategy.Strategy}.
    */
-  void offer(Message next, Deferred<?, MessageDroppedException, Integer> deferred) {
-    SendingTask task = new SendingTask(next, deferred);
+  void offer(MessagePromise promise) {
+    Message message = promise.message();
+
     lock.lock();
     try {
       ensureCapacity(count + 1);
       if (isFull()) {
         switch (overflowStrategy) {
           case DropNew:
-            deferred.reject(dropped(DropNew, next));
+            promise.setFailure(dropped(DropNew, message));
             return;
           case DropTail:
-            SendingTask tail = dropTail();
-            enqueue(task);
-            tail.deferred.reject(dropped(DropTail, tail.message));
+            MessagePromise tail = dropTail();
+            enqueue(promise);
+            tail.setFailure(dropped(DropTail, tail.message()));
             return;
           case DropHead:
-            SendingTask head = dropHead();
-            enqueue(task);
-            head.deferred.reject(dropped(DropHead, head.message));
+            MessagePromise head = dropHead();
+            enqueue(promise);
+            head.setFailure(dropped(DropHead, head.message()));
             return;
           case DropBuffer:
-            List<SendingTask> allElements = removeAll();
+            List<MessagePromise> allElements = removeAll();
             doClear();
-            enqueue(task);
-            rejectAll(allElements, DropBuffer);
+            enqueue(promise);
+            Promises.allFail(allElements, DropBuffer);
             return;
           case Block:
             break;
@@ -96,18 +100,9 @@ final class SizeBoundedQueue {
             throw new BufferOverflowException("Max size of " + count + " is reached.");
         }
       }
-      enqueue(task);
+      enqueue(promise);
     } finally {
       lock.unlock();
-    }
-  }
-
-  private void rejectAll(List<SendingTask> tasks, Strategy overflowStrategy) {
-    Object[] messageAndDeferred = SendingTask.unzip(tasks);
-    List<Message> messages = (List<Message>) messageAndDeferred[0];
-    List<Deferred> deferreds = (List<Deferred>) messageAndDeferred[1];
-    for (Deferred deferred : deferreds) {
-      deferred.reject(dropped(overflowStrategy, messages));
     }
   }
 
@@ -142,11 +137,11 @@ final class SizeBoundedQueue {
   /**
    * Drop the last element
    */
-  private SendingTask dropTail() {
+  private MessagePromise dropTail() {
     if (--writePos == -1) {
       writePos = elements.length - 1; // circle forward to the end of the array
     }
-    SendingTask tail = elements[writePos];
+    MessagePromise tail = elements[writePos];
     elements[writePos] = null;
     count--;
     notFull.signal();
@@ -156,8 +151,8 @@ final class SizeBoundedQueue {
   /**
    * Drop the first element
    */
-  private SendingTask dropHead() {
-    SendingTask head = elements[readPos];
+  private MessagePromise dropHead() {
+    MessagePromise head = elements[readPos];
     elements[readPos] = null;
     if (++readPos == elements.length) {
       readPos = 0; // circle back to the front of the array
@@ -167,7 +162,7 @@ final class SizeBoundedQueue {
     return head;
   }
 
-  private void enqueue(SendingTask next) {
+  private void enqueue(MessagePromise next) {
     try {
       while (isFull()) {
         notFull.await();
@@ -179,16 +174,25 @@ final class SizeBoundedQueue {
       }
 
       count++;
-      next.deferred.notify(1); // notify for benchmark
+      if (_benchmark) {
+        next.setSuccess();
+      }
     } catch (InterruptedException e) {
     }
   }
 
-  private List<SendingTask> removeAll() {
-    final List<SendingTask> result = new LinkedList<>();
+  /**
+   * Set the benchmark mode
+   */
+  void _setBenchmarkMode(boolean benchmark) {
+    _benchmark = benchmark;
+  }
+
+  private List<MessagePromise> removeAll() {
+    final List<MessagePromise> result = new LinkedList<>();
     doDrain(new Consumer() {
       @Override
-      public boolean accept(SendingTask next) {
+      public boolean accept(MessagePromise next) {
         return result.add(next);
       }
     });
@@ -209,7 +213,7 @@ final class SizeBoundedQueue {
     int drainedCount = 0;
 
     while (drainedCount < count) {
-      SendingTask next = elements[readPos];
+      MessagePromise next = elements[readPos];
 
       if (next == null) {
         break;

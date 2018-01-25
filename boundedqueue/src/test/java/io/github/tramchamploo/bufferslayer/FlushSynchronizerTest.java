@@ -10,9 +10,6 @@ import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Test;
 
-/**
- * Created by tramchamploo on 2017/5/27.
- */
 public class FlushSynchronizerTest {
 
   FlushSynchronizer synchronizer = new FlushSynchronizer();

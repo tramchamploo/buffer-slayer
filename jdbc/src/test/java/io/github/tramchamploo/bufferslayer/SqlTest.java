@@ -10,9 +10,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import org.junit.Test;
 
-/**
- * Created by tramchamploo on 2017/5/31.
- */
 public class SqlTest {
 
   @Test

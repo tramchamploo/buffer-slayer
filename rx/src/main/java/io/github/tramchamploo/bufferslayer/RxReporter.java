@@ -6,7 +6,10 @@ import static java.util.Collections.singletonList;
 
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
-import io.github.tramchamploo.bufferslayer.internal.SendingTask;
+import io.github.tramchamploo.bufferslayer.internal.Future;
+import io.github.tramchamploo.bufferslayer.internal.FutureListener;
+import io.github.tramchamploo.bufferslayer.internal.MessageFuture;
+import io.github.tramchamploo.bufferslayer.internal.MessagePromise;
 import io.reactivex.BackpressureOverflowStrategy;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
@@ -18,18 +21,13 @@ import io.reactivex.functions.Action;
 import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.jdeferred.Deferred;
-import org.jdeferred.FailCallback;
-import org.jdeferred.Promise;
-import org.jdeferred.impl.DeferredObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class RxReporter<M extends Message, R> implements Reporter<M, R>, FlowableOnSubscribe<SendingTask<M>> {
+public class RxReporter<M extends Message, R> implements Reporter<M, R>, FlowableOnSubscribe<MessagePromise<R>> {
 
   static final Logger logger = LoggerFactory.getLogger(RxReporter.class);
 
@@ -41,7 +39,7 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
   final ReporterMetrics metrics;
   final AtomicBoolean closed = new AtomicBoolean(false);
 
-  private FlowableEmitter<SendingTask<M>> emitter;
+  private FlowableEmitter<MessagePromise<R>> emitter;
   private Scheduler scheduler;
 
   private RxReporter(Builder<M, R> builder) {
@@ -54,7 +52,7 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
     this.overflowStrategy = builder.overflowStrategy;
     this.scheduler = builder.scheduler;
 
-    Flowable<SendingTask<M>> flowable = Flowable.create(this, BackpressureStrategy.MISSING);
+    Flowable<MessagePromise<R>> flowable = Flowable.create(this, BackpressureStrategy.MISSING);
     initBackpressurePolicy(flowable)
         .observeOn(Schedulers.single())
         .groupBy(new MessagePartitioner())
@@ -65,12 +63,12 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
     return new Builder<>(sender);
   }
 
-  private Flowable<SendingTask<M>> initBackpressurePolicy(Flowable<SendingTask<M>> flowable) {
+  private Flowable<MessagePromise<R>> initBackpressurePolicy(Flowable<MessagePromise<R>> flowable) {
     Strategy strategy = this.overflowStrategy;
     if (strategy == Strategy.DropNew) {
-      return flowable.onBackpressureDrop(new Consumer<SendingTask<M>>() {
+      return flowable.onBackpressureDrop(new Consumer<MessagePromise<R>>() {
         @Override
-        public void accept(SendingTask<M> task) throws Exception {
+        public void accept(MessagePromise<R> promise) {
           metricsCallback(1);
         }
       });
@@ -78,7 +76,7 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
       BackpressureOverflowStrategy rxStrategy = RxOverflowStrategyBridge.toRxStrategy(strategy);
       return flowable.onBackpressureBuffer(pendingMaxMessages, new Action() {
         @Override
-        public void run() throws Exception {
+        public void run() {
           metricsCallback(1);
         }
       }, rxStrategy);
@@ -108,7 +106,7 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
     }
   }
 
-  private class MessageGroupSubscriber implements Consumer<GroupedFlowable<MessageKey, SendingTask<M>>> {
+  private class MessageGroupSubscriber implements Consumer<GroupedFlowable<MessageKey, MessagePromise<R>>> {
 
     final long messageTimeoutNanos;
     final int bufferedMaxMessages;
@@ -126,17 +124,18 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
     }
 
     @Override
-    public void accept(GroupedFlowable<MessageKey, SendingTask<M>> group) throws Exception {
-      Flowable<List<SendingTask<M>>> bufferedMessages = group.buffer(messageTimeoutNanos, TimeUnit.NANOSECONDS, scheduler, bufferedMaxMessages);
+    public void accept(GroupedFlowable<MessageKey, MessagePromise<R>> group) {
+      Flowable<List<MessagePromise<R>>> bufferedMessages =
+          group.buffer(messageTimeoutNanos, TimeUnit.NANOSECONDS, scheduler, bufferedMaxMessages);
       bufferedMessages.subscribeOn(scheduler).subscribe(SenderConsumerBridge.toConsumer(sender));
     }
   }
 
-  private class MessagePartitioner implements Function<SendingTask<M>, MessageKey> {
+  private class MessagePartitioner implements Function<MessagePromise<R>, MessageKey> {
 
     @Override
-    public MessageKey apply(SendingTask<M> task) throws Exception {
-      return task.message.asMessageKey();
+    public MessageKey apply(MessagePromise<R> promise) {
+      return promise.message().asMessageKey();
     }
   }
 
@@ -147,39 +146,45 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
 
   @Override
   @SuppressWarnings("unchecked")
-  public Promise<R, MessageDroppedException, ?> report(M message) {
+  public MessageFuture<R> report(M message) {
     checkNotNull(message, "message");
     metrics.incrementMessages(1);
 
     if (closed.get()) { // Drop the message when closed.
-      DeferredObject<R, MessageDroppedException, Integer> deferred = new DeferredObject<>();
-      deferred.reject(dropped(new IllegalStateException("closed!"), singletonList(message)));
+      MessageDroppedException cause =
+          dropped(new IllegalStateException("closed!"), singletonList(message));
+      MessageFuture<R> future = (MessageFuture<R>) message.newFailedFuture(cause);
       metricsCallback(1);
-      return deferred.promise();
+      return future;
     }
 
-    Deferred<R, MessageDroppedException, Integer> deferred = new DeferredObject<>();
-    emitter.onNext(new SendingTask(message, deferred));
-    return deferred.promise().fail(loggingCallback());
+    MessagePromise<R> promise = message.newPromise();
+    emitter.onNext(promise);
+    setLoggingListener(promise);
+    return promise;
   }
 
-  private FailCallback<MessageDroppedException> loggingCallback() {
-    return new FailCallback<MessageDroppedException>() {
+  private void setLoggingListener(MessageFuture<R> future) {
+    future.addListener(new FutureListener<R>() {
+
       @Override
-      public void onFail(MessageDroppedException reject) {
-        metricsCallback(reject.dropped.size());
-        logger.warn(reject.getMessage());
+      public void operationComplete(Future<R> future) {
+        if (!future.isSuccess()) {
+          MessageDroppedException cause = (MessageDroppedException) future.cause();
+          metricsCallback(cause.dropped.size());
+          logger.warn(cause.getMessage());
+        }
       }
-    };
+    });
   }
 
   @Override
-  public void subscribe(FlowableEmitter<SendingTask<M>> emitter) throws Exception {
+  public void subscribe(FlowableEmitter<MessagePromise<R>> emitter) throws Exception {
     this.emitter = emitter;
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     if (!closed.compareAndSet(false, true)) return;
     emitter.onComplete();
   }

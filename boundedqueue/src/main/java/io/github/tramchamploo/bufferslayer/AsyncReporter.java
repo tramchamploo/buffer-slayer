@@ -8,11 +8,18 @@ import static java.util.Collections.singletonList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.QueueManager.Callback;
-import io.github.tramchamploo.bufferslayer.internal.SendingTask;
+import io.github.tramchamploo.bufferslayer.internal.CompositeFuture;
+import io.github.tramchamploo.bufferslayer.internal.Future;
+import io.github.tramchamploo.bufferslayer.internal.FutureListener;
+import io.github.tramchamploo.bufferslayer.internal.MessageFuture;
+import io.github.tramchamploo.bufferslayer.internal.MessagePromise;
+import io.github.tramchamploo.bufferslayer.internal.SucceededFuture;
 import java.io.Flushable;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -20,41 +27,41 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import org.jdeferred.Deferred;
-import org.jdeferred.FailCallback;
-import org.jdeferred.Promise;
-import org.jdeferred.impl.DeferredObject;
-import org.jdeferred.multiple.MasterProgress;
-import org.jdeferred.multiple.MultipleResults;
-import org.jdeferred.multiple.OneReject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> implements Reporter<M, R>, Flushable {
 
   static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
-  static final int DEFAULT_TIMER_THREADS = Runtime.getRuntime().availableProcessors();
-  static final int MAX_BUFFER_POOL_ENTRIES = 1000;
+
+  private static final int MAX_BUFFER_POOL_ENTRIES = 1000;
+  static final int DEFAULT_TIMER_THREADS = 1;
+  static final int DEFAULT_FLUSH_THREADS = 1;
 
   static AtomicLong idGenerator = new AtomicLong();
   final Long id = idGenerator.getAndIncrement();
-  final AsyncSender<M> sender;
-  final ReporterMetrics metrics;
+  final AsyncSender<R> sender;
+
   final long messageTimeoutNanos;
   final int bufferedMaxMessages;
-  final boolean singleKey;
-  final int flushThreads;
-  final int timerThreads;
-  final FlushThreadFactory flushThreadFactory;
-  final CopyOnWriteArraySet<Thread> flushers = new CopyOnWriteArraySet<>();
+  private final ReporterMetrics metrics;
+  private final boolean singleKey;
+
+  private final int timerThreads;
+  private final int flushThreads;
+  private final FlushThreadFactory flushThreadFactory;
+  Set<Thread> flushers;
+
   final FlushSynchronizer synchronizer = new FlushSynchronizer();
   final QueueManager queueManager;
-  final AtomicBoolean started = new AtomicBoolean(false);
+
+  private final AtomicBoolean started = new AtomicBoolean(false);
   final AtomicBoolean closed = new AtomicBoolean(false);
   CountDownLatch close;
+
   ScheduledExecutorService scheduler;
-  BufferPool bufferPool;
-  final MemoryLimiter memoryLimiter;
+  private BufferPool bufferPool;
+  private final MemoryLimiter memoryLimiter;
 
   AsyncReporter(Builder<M, R> builder) {
     this.sender = toAsyncSender(builder);
@@ -80,7 +87,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     }
   }
 
-  AsyncSender<M> toAsyncSender(Builder<M, R> builder) {
+  AsyncSender<R> toAsyncSender(Builder<M, R> builder) {
     return new AsyncSenderAdaptor<>(builder.sender, builder.sharedSenderThreads);
   }
 
@@ -91,7 +98,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   public static final class Builder<M extends Message, R> extends Reporter.Builder<Builder<M, R>, M, R> {
 
     int sharedSenderThreads = 1;
-    int flushThreads = 1;
+    int flushThreads = DEFAULT_FLUSH_THREADS;
     int timerThreads = DEFAULT_TIMER_THREADS;
     long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
     boolean singleKey = false;
@@ -157,7 +164,8 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
               .setNameFormat("AsyncReporter-" + id + "-timer-%d")
               .setDaemon(true)
               .build();
-          ScheduledThreadPoolExecutor timerPool = new ScheduledThreadPoolExecutor(timerThreads, timerFactory);
+          ScheduledThreadPoolExecutor timerPool =
+              new ScheduledThreadPoolExecutor(timerThreads, timerFactory);
           timerPool.setRemoveOnCancelPolicy(true);
           this.scheduler = timerPool;
           return timerPool;
@@ -168,111 +176,126 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   }
 
   @Override
-  public Promise<R, MessageDroppedException, Integer> report(M message) {
+  @SuppressWarnings("unchecked")
+  public MessageFuture<R> report(M message) {
     checkNotNull(message, "message");
     metrics.incrementMessages(1);
 
     if (closed.get()) { // Drop the message when closed.
-      DeferredObject<R, MessageDroppedException, Integer> deferred = new DeferredObject<>();
-      deferred.reject(dropped(new IllegalStateException("closed!"), singletonList(message)));
-      return deferred.promise().fail(metricsCallback());
+      MessageDroppedException cause =
+          dropped(new IllegalStateException("closed!"), singletonList(message));
+      MessageFuture<R> future = (MessageFuture<R>) message.newFailedFuture(cause);
+      setFailListener(future);
+      return future;
     }
 
     // Lazy initialize flush threads
-    if (messageTimeoutNanos > 0 &&
-        started.compareAndSet(false, true)) {
+    if (started.compareAndSet(false, true) &&
+        messageTimeoutNanos > 0) {
       startFlushThreads();
     }
 
     memoryLimiter.waitWhenMaximum();
     // If singleKey is true, ignore original message key.
-    Message.MessageKey key = message.asMessageKey();
-    key = singleKey ? Message.SINGLE_KEY : key;
+    Message.MessageKey key = singleKey ?
+        Message.SINGLE_KEY : message.asMessageKey();
 
     // Offer message to pending queue.
     SizeBoundedQueue pending = queueManager.getOrCreate(key);
-    Deferred<R, MessageDroppedException, Integer> deferred = new DeferredObject<>();
-    pending.offer(message, deferred);
+    MessagePromise<R> promise = message.newPromise();
+    pending.offer(promise);
+    setFailListener(promise);
+
     if (pending.size() >= bufferedMaxMessages)
       synchronizer.offer(pending);
-    return deferred.promise().fail(metricsCallback());
+    return promise;
   }
 
   private void startFlushThreads() {
+    Set<Thread> flushers = new HashSet<>(flushThreads);
     for (int i = 0; i < flushThreads; i++) {
       Thread thread = flushThreadFactory.newFlushThread();
       thread.start();
       flushers.add(thread);
     }
+    this.flushers = Collections.unmodifiableSet(flushers);
   }
 
   /**
    * Update metrics if reporting failed.
    */
-  private FailCallback<MessageDroppedException> metricsCallback() {
-    return new FailCallback<MessageDroppedException>() {
+  private void setFailListener(MessageFuture<R> future) {
+    future.addListener(new FutureListener<R>() {
+
       @Override
-      public void onFail(MessageDroppedException ignored) {
-        metrics.incrementMessagesDropped(1);
+      public void operationComplete(Future future) {
+        if (!future.isSuccess()) {
+          metrics.incrementMessagesDropped(1);
+        }
       }
-    };
+    });
   }
 
   @Override
   public void flush() {
-    try {
-      for (SizeBoundedQueue pending : queueManager.elements()) {
-        Promise<MultipleResults, OneReject, MasterProgress> promise = flush(pending);
-        promise.waitSafely();
-      }
-    } catch (InterruptedException e) {
-      logger.warn("Interrupted flushing messages.");
+    for (SizeBoundedQueue pending : queueManager.elements()) {
+      Future<?> future = flush(pending);
+      future.awaitUninterruptibly();
     }
   }
 
   @SuppressWarnings("unchecked")
-  Promise<MultipleResults, OneReject, MasterProgress> flush(SizeBoundedQueue pending) {
-    Buffer<M> buffer = bufferPool.acquire();
+  Future<?> flush(SizeBoundedQueue pending) {
+    // Remove overtime queues and relative metrics and timer
+    List<MessageKey> shrinked = queueManager.shrink();
+    clearMetricsAndTimer(shrinked);
+
+    CompositeFuture result;
+    Buffer buffer = bufferPool.acquire();
     try {
       int drained = pending.drainTo(buffer);
-      // Remove overtime queues and relative metrics and timer
-      List<MessageKey> shrinked = queueManager.shrink();
-      clearMetricsAndTimer(shrinked);
       if (drained == 0) {
-        return new DeferredObject<MultipleResults, OneReject, MasterProgress>()
-            .resolve(new MultipleResults(0)).promise();
+        return new SucceededFuture(null, null);
       }
-      // Update metrics
-      metrics.updateQueuedMessages(pending.key, pending.count);
-      if (!memoryLimiter.isMaximum()) memoryLimiter.signalAll();
 
-      final List<SendingTask<M>> tasks = buffer.drain();
-      Promise<MultipleResults, OneReject, MasterProgress> promise = sender.send(tasks);
-      promise.fail(loggingCallback());
-      return promise;
+      List<MessagePromise<R>> promises = buffer.drain();
+      result = sender.send(promises);
     } finally {
       bufferPool.release(buffer);
     }
+    // Update metrics
+    metrics.updateQueuedMessages(pending.key, pending.count);
+    // Signal producers
+    if (!memoryLimiter.isMaximum()) {
+      memoryLimiter.signalAll();
+    }
+    logWhenFailed(result);
+    return result;
   }
 
   private void clearMetricsAndTimer(Collection<MessageKey> keys) {
     for (MessageKey key: keys) {
       metrics.removeQueuedMessages(key);
-      if (isTimerActive(key)) cancelTimer(key);
+      if (isTimerActive(key)) {
+        cancelTimer(key);
+      }
     }
   }
 
   /**
    * Log errors only when sending fails.
    */
-  private FailCallback<OneReject> loggingCallback() {
-    return new FailCallback<OneReject>() {
+  private void logWhenFailed(CompositeFuture future) {
+    future.addListener(new FutureListener<CompositeFuture>() {
+
       @Override
-      public void onFail(OneReject reject) {
-        MessageDroppedException ex = (MessageDroppedException) reject.getReject();
-        logger.warn(ex.getMessage());
+      public void operationComplete(Future<CompositeFuture> future) {
+        if (!future.isSuccess()) {
+          MessageDroppedException ex = (MessageDroppedException) future.cause();
+          logger.warn(ex.getMessage());
+        }
       }
-    };
+    });
   }
 
   @Override

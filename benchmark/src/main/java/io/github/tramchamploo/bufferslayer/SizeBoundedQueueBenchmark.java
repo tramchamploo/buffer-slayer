@@ -1,8 +1,8 @@
 package io.github.tramchamploo.bufferslayer;
 
+import io.github.tramchamploo.bufferslayer.internal.MessageFuture;
+import io.github.tramchamploo.bufferslayer.internal.MessagePromise;
 import java.util.concurrent.TimeUnit;
-import org.jdeferred.Deferred;
-import org.jdeferred.impl.DeferredObject;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -32,19 +32,13 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @SuppressWarnings("unchecked")
 public class SizeBoundedQueueBenchmark {
 
-  static Message newMessage() {
-    return TestMessage.newMessage(0);
-  }
-
   @State(Scope.Thread)
   public static class Factory {
-    Deferred<?, MessageDroppedException, Integer> deferred = null;
-    Message message = null;
+    MessagePromise<Object> promise = null;
 
     @Setup(Level.Invocation)
     public void setup() {
-      message = newMessage();
-      deferred = new DeferredObject<>();
+      promise = TestMessage.newMessage(0).newPromise();
     }
   }
 
@@ -54,10 +48,14 @@ public class SizeBoundedQueueBenchmark {
     public int offersMade;
     public int offersFailed;
 
-    void addCallback(Deferred<?, ?, ?> deferred) {
-      deferred.promise()
-          .progress(i -> offersMade += 1)
-          .fail(f -> offersFailed += 1);
+    void addCallback(MessageFuture<?> future) {
+      future.addListener(f -> {
+        if (f.isSuccess()) {
+          offersMade += 1;
+        } else {
+          offersFailed += 1;
+        }
+      });
     }
 
     @Setup(Level.Iteration)
@@ -91,6 +89,7 @@ public class SizeBoundedQueueBenchmark {
   @Setup
   public void setup() {
     q = new SizeBoundedQueue(10000, OverflowStrategy.block, Message.SINGLE_KEY);
+    q._setBenchmarkMode(true);
   }
 
   @TearDown(Level.Iteration)
@@ -102,45 +101,42 @@ public class SizeBoundedQueueBenchmark {
 
   @Benchmark @Group("no_contention") @GroupThreads(1)
   public void no_contention_offer(OfferCounters counters, Factory factory) {
-    counters.addCallback(factory.deferred);
-    q.offer(factory.message, factory.deferred);
+    counters.addCallback(factory.promise);
+    q.offer(factory.promise);
   }
 
   @Benchmark @Group("no_contention") @GroupThreads(1)
   public void no_contention_drain(DrainCounters counters, ConsumerMarker cm) {
     q.drainTo(next -> {
       counters.drained++;
-      next.deferred.resolve(null);
       return true;
     });
   }
 
   @Benchmark @Group("mild_contention") @GroupThreads(2)
   public void mild_contention_offer(OfferCounters counters, Factory factory) {
-    counters.addCallback(factory.deferred);
-    q.offer(factory.message, factory.deferred);
+    counters.addCallback(factory.promise);
+    q.offer(factory.promise);
   }
 
   @Benchmark @Group("mild_contention") @GroupThreads(1)
   public void mild_contention_drain(DrainCounters counters, ConsumerMarker cm) {
     q.drainTo(next -> {
       counters.drained++;
-      next.deferred.resolve(null);
       return true;
     });
   }
 
   @Benchmark @Group("high_contention") @GroupThreads(8)
   public void high_contention_offer(OfferCounters counters, Factory factory) {
-    counters.addCallback(factory.deferred);
-    q.offer(factory.message, factory.deferred);
+    counters.addCallback(factory.promise);
+    q.offer(factory.promise);
   }
 
   @Benchmark @Group("high_contention") @GroupThreads(1)
   public void high_contention_drain(DrainCounters counters, ConsumerMarker cm) {
     q.drainTo(next -> {
       counters.drained++;
-      next.deferred.resolve(null);
       return true;
     });
   }

@@ -3,7 +3,7 @@ package io.github.tramchamploo.bufferslayer;
 import java.io.Closeable;
 
 /**
- * Created by tramchamploo on 2017/3/16.
+ * Exporter that export data of a {@link ReporterMetrics}
  */
 public abstract class ReporterMetricsExporter implements Closeable {
 

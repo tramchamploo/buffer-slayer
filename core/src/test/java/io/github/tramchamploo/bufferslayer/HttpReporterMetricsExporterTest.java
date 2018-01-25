@@ -8,9 +8,6 @@ import okhttp3.Request;
 import okhttp3.Response;
 import org.junit.Test;
 
-/**
- * Created by tramchamploo on 2017/5/18.
- */
 public class HttpReporterMetricsExporterTest {
 
   OkHttpClient client = new OkHttpClient();

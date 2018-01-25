@@ -19,6 +19,7 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.springframework.jdbc.core.ArgumentPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.core.PreparedStatementCreatorFactory;
@@ -46,14 +47,14 @@ public class BatchJdbcTemplateTest {
   }
 
   @BeforeClass
-  public static void init() throws Exception {
+  public static void init() {
     dataSource = new DriverManagerDataSource();
     dataSource.setDriverClassName("org.h2.Driver");
     dataSource.setUrl("jdbc:h2:~/test");
   }
 
   @Before
-  public void setup() throws InterruptedException {
+  public void setup() {
     underlying = new JdbcTemplate(dataSource);
     underlying.setDataSource(dataSource);
     underlying.update(CREATE_TABLE);
@@ -127,7 +128,7 @@ public class BatchJdbcTemplateTest {
   }
 
   @Test
-  public void rejectedPromise() throws InterruptedException {
+  public void updateFailed() throws InterruptedException {
     SenderProxy sender = new SenderProxy(new JdbcTemplateSender(underlying));
     RuntimeException ex = new RuntimeException();
     sender.onMessages(messages -> { throw ex; });
@@ -135,27 +136,28 @@ public class BatchJdbcTemplateTest {
     batchJdbcTemplate = new BatchJdbcTemplate(underlying, reporter);
 
     CountDownLatch countDown = new CountDownLatch(1);
-    batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()}).fail(d -> {
-      assertNotNull(d);
-      assertEquals(ex, d.getCause());
-      countDown.countDown();
-    });
+    batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()})
+        .addListener(future -> {
+          assertNotNull(future.cause());
+          assertEquals(ex, future.cause().getCause());
+          countDown.countDown();
+        });
     countDown.await();
   }
 
   @Test
-  public void chainedDeferred() throws InterruptedException {
+  public void callbackInCallback() throws InterruptedException {
     reporter = AsyncReporter.builder(new JdbcTemplateSender(underlying))
         .messageTimeout(10, TimeUnit.MILLISECONDS)
         .build();
     batchJdbcTemplate = new BatchJdbcTemplate(underlying, reporter);
 
     CountDownLatch countDown = new CountDownLatch(1);
-    batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()}).done(d -> {
-      assertEquals(new Integer(1), d);
+    batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()}).addListener(f -> {
+      assertEquals(1, f.get());
       String expected = randomString();
-      batchJdbcTemplate.update(MODIFICATION, new Object[]{expected}).done(dd -> {
-        assertEquals(new Integer(1), dd);
+      batchJdbcTemplate.update(MODIFICATION, new Object[]{expected}).addListener(ff -> {
+        assertEquals(1, ff.get());
         int rowCount = batchJdbcTemplate.queryForObject(ROW_COUNT, Integer.class);
         assertEquals(1, rowCount);
         Object data = batchJdbcTemplate
@@ -236,6 +238,45 @@ public class BatchJdbcTemplateTest {
 
     batchJdbcTemplate.update(creator);
     batchJdbcTemplate.update(creator);
+
+    reporter.flush();
+    int rowCount = batchJdbcTemplate.queryForObject("SELECT COUNT(1) FROM test;", Integer.class);
+    assertEquals(2, rowCount);
+  }
+
+  @Test
+  public void updateWithPreparedStatementSetter() {
+    reporter = AsyncReporter.builder(new JdbcTemplateSender(underlying))
+        .pendingMaxMessages(2)
+        .bufferedMaxMessages(2)
+        .messageTimeout(0, TimeUnit.MILLISECONDS)
+        .build();
+    batchJdbcTemplate = new BatchJdbcTemplate(underlying, reporter);
+
+    ArgumentPreparedStatementSetter statementSetter =
+        new ArgumentPreparedStatementSetter(new Object[]{randomString(), new Date()});
+
+    batchJdbcTemplate.update(INSERTION, statementSetter);
+    batchJdbcTemplate.update(INSERTION, statementSetter);
+
+    reporter.flush();
+    int rowCount = batchJdbcTemplate.queryForObject("SELECT COUNT(1) FROM test;", Integer.class);
+    assertEquals(2, rowCount);
+  }
+
+  @Test
+  public void updateWithArgTypes() {
+    reporter = AsyncReporter.builder(new JdbcTemplateSender(underlying))
+        .pendingMaxMessages(2)
+        .bufferedMaxMessages(2)
+        .messageTimeout(0, TimeUnit.MILLISECONDS)
+        .build();
+    batchJdbcTemplate = new BatchJdbcTemplate(underlying, reporter);
+
+    batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()},
+        new int[]{Types.VARCHAR, Types.TIMESTAMP});
+    batchJdbcTemplate.update(INSERTION, new Object[]{randomString(), new Date()},
+        new int[]{Types.VARCHAR, Types.TIMESTAMP});
 
     reporter.flush();
     int rowCount = batchJdbcTemplate.queryForObject("SELECT COUNT(1) FROM test;", Integer.class);
