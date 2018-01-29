@@ -62,14 +62,15 @@ AsyncReporterProperties reporterProperties = new AsyncReporterProperties()
 
 BatchJdbcTemplate template = new BatchJdbcTemplate(yourFormerJdbcTemplate, reporterProperties);
 
-Promise promise = template.update(...);
-promise.done(success -> ...)
-       .fail(reject -> ...);
+MessageFuture<Integer> future = template.update(...);
+future.addListener(f -> {
+  // Your callback
+});
 ```
 
 ## Usage
 
-### [ReporterProperties](boundedqueue/src/main/java/io/github/tramchamploo/bufferslayer/ReporterProperties.java)
+### [ReporterProperties](boundedqueue/src/main/java/io/github/tramchamploo/bufferslayer/AsyncReporterProperties.java)
 This is where you configure all properties.
 
 * `sender`: Sender that messages are flushed into. Necessary but often not needed for users to configure. Implementations like `JdbcTemplate` will configure it by itself.
@@ -91,13 +92,13 @@ Here is a simple jdbc benchmark result on my MacBook Pro (Retina, 13-inch, Late 
 Using mysql 5.7.18, keeps executing a simple `INSERT INTO test.benchmark(data, time) VALUES(?, ?);`
 
 ```
-Benchmark                                                    Mode  Cnt       Score  Units
-BatchJdbcTemplateBenchmark.high_contention_batched          thrpt   15   27917.086  ops/s
-BatchJdbcTemplateBenchmark.high_contention_unbatched        thrpt   15     316.562  ops/s
-BatchJdbcTemplateBenchmark.mild_contention_batched          thrpt   15   18672.057  ops/s
-BatchJdbcTemplateBenchmark.mild_contention_unbatched        thrpt   15     280.970  ops/s
-BatchJdbcTemplateBenchmark.no_contention_batched            thrpt   15    9053.288  ops/s
-BatchJdbcTemplateBenchmark.no_contention_unbatched          thrpt   15     198.581  ops/s
+Benchmark                                                        Mode    Cnt      Score       Error  Units
+AsyncBatchJdbcTemplateBenchmark.high_contention_batched          thrpt   15  201510.137 ± 33755.347  ops/s
+AsyncBatchJdbcTemplateBenchmark.high_contention_unbatched        thrpt   15     200.427 ±    52.891  ops/s
+AsyncBatchJdbcTemplateBenchmark.mild_contention_batched          thrpt   15   52258.451 ±  7328.203  ops/s
+AsyncBatchJdbcTemplateBenchmark.mild_contention_unbatched        thrpt   15     222.447 ±    25.284  ops/s
+AsyncBatchJdbcTemplateBenchmark.no_contention_batched            thrpt   15   30075.936 ±  2797.128  ops/s
+AsyncBatchJdbcTemplateBenchmark.no_contention_unbatched          thrpt   15     145.993 ±    27.643  ops/s
 ```
 
 ## Components
