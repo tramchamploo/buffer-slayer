@@ -64,7 +64,7 @@ public class AsyncReporterTest {
       }
     }
 
-    assertTrue(countDown.await(200, TimeUnit.MILLISECONDS));
+    assertTrue(countDown.await(300, TimeUnit.MILLISECONDS));
     assertEquals(50, sender.sent.size());
 
     // make sure the queue is released
