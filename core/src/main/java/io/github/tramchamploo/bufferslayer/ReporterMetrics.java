@@ -3,7 +3,7 @@ package io.github.tramchamploo.bufferslayer;
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 
 /**
- * Created by tramchamploo on 2017/2/27.
+ * Metrics of reporter
  */
 public abstract class ReporterMetrics {
 

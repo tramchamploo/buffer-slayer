@@ -1,22 +1,19 @@
 package io.github.tramchamploo.bufferslayer;
 
 import io.github.tramchamploo.bufferslayer.internal.Component;
-import io.github.tramchamploo.bufferslayer.internal.SendingTask;
+import io.github.tramchamploo.bufferslayer.internal.CompositeFuture;
+import io.github.tramchamploo.bufferslayer.internal.MessagePromise;
 import java.util.List;
-import org.jdeferred.Promise;
-import org.jdeferred.multiple.MasterProgress;
-import org.jdeferred.multiple.MultipleResults;
-import org.jdeferred.multiple.OneReject;
 
 /**
  * Sender that send messages in async way and return a promise
  */
-public interface AsyncSender<M extends Message> extends Component {
+public interface AsyncSender<R> extends Component {
 
   /**
    * asynchronously send messages
    *
-   * @param messages messages to send
+   * @param promises messages to send
    */
-  Promise<MultipleResults, OneReject, MasterProgress> send(List<SendingTask<M>> messages);
+  CompositeFuture send(List<MessagePromise<R>> promises);
 }

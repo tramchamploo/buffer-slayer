@@ -21,11 +21,6 @@
     </dependency>
 
     <dependency>
-      <groupId>org.jdeferred</groupId>
-      <artifactId>jdeferred-core</artifactId>
-    </dependency>
-
-    <dependency>
       <groupId>com.squareup.okhttp3</groupId>
       <artifactId>okhttp</artifactId>
       <version>3.8.0</version>

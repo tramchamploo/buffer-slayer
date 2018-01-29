@@ -18,7 +18,10 @@ final class BufferPool {
     this.onlyAcceptSame = onlyAcceptSame;
   }
 
-  <M extends Message> Buffer<M> acquire() {
+  /**
+   * Acquire a buffer from the pool
+   */
+  Buffer acquire() {
     synchronized (this) {
       if (next != null) {
         Buffer result = next;
@@ -29,9 +32,13 @@ final class BufferPool {
         return result;
       }
     }
-    return new Buffer<>(bufferSize, onlyAcceptSame);
+    return new Buffer(bufferSize, onlyAcceptSame);
   }
 
+  /**
+   * Return the buffer back to pool
+   * @param buffer buffer to return to pool
+   */
   void release(Buffer buffer) {
     if (buffer.next != null) throw new IllegalArgumentException();
     synchronized (this) {

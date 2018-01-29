@@ -2,11 +2,11 @@ package io.github.tramchamploo.bufferslayer;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.github.tramchamploo.bufferslayer.Sql.Builder;
+import io.github.tramchamploo.bufferslayer.internal.MessageFuture;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
-import org.jdeferred.Promise;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.CallableStatementCallback;
@@ -160,7 +160,7 @@ public class BatchJdbcTemplate {
     return delegate.queryForRowSet(sql);
   }
 
-  public Promise<Integer, MessageDroppedException, ?> update(String sql) throws DataAccessException {
+  public MessageFuture<Integer> update(String sql) throws DataAccessException {
     return reporter.report(Sql.builder().sql(sql).build());
   }
 
@@ -328,7 +328,7 @@ public class BatchJdbcTemplate {
     return delegate.queryForRowSet(sql, args);
   }
 
-  public Promise<Integer, MessageDroppedException, ?> update(PreparedStatementCreator psc) throws DataAccessException {
+  public MessageFuture<Integer> update(PreparedStatementCreator psc) throws DataAccessException {
     if (psc instanceof SqlProvider) {
       SqlProvider sqlProvider = (SqlProvider) psc;
       String sql = sqlProvider.getSql();
@@ -348,14 +348,14 @@ public class BatchJdbcTemplate {
     return delegate.update(psc, generatedKeyHolder);
   }
 
-  public Promise<Integer, MessageDroppedException, ?> update(String sql, PreparedStatementSetter pss) throws DataAccessException {
+  public MessageFuture<Integer> update(String sql, PreparedStatementSetter pss) throws DataAccessException {
     return reporter.report(Sql.builder()
         .sql(sql)
         .preparedStatementSetter(pss)
         .build());
   }
 
-  public Promise<Integer, MessageDroppedException, ?> update(String sql, Object[] args, int[] argTypes) throws DataAccessException {
+  public MessageFuture<Integer> update(String sql, Object[] args, int[] argTypes) throws DataAccessException {
     return reporter.report(Sql.builder()
         .sql(sql)
         .args(args)
@@ -363,7 +363,7 @@ public class BatchJdbcTemplate {
         .build());
   }
 
-  public Promise<Integer, MessageDroppedException, ?> update(String sql, Object... args) throws DataAccessException {
+  public MessageFuture<Integer> update(String sql, Object... args) throws DataAccessException {
     return reporter.report(Sql.builder()
         .sql(sql)
         .args(args)

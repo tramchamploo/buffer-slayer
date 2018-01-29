@@ -10,7 +10,6 @@ import org.springframework.jdbc.core.ArgumentTypePreparedStatementSetter;
 import org.springframework.jdbc.core.PreparedStatementSetter;
 
 /**
- * Created by tramchamploo on 2017/2/27.
  * Represent sql to be sent
  */
 public final class Sql extends Message {

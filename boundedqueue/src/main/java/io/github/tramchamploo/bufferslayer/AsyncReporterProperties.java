@@ -7,7 +7,7 @@ public class AsyncReporterProperties extends AbstractReporterProperties<AsyncRep
 
   private int sharedSenderThreads = 1;
   private long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
-  private int flushThreads = 1;
+  private int flushThreads = AsyncReporter.DEFAULT_FLUSH_THREADS;
   private int timerThreads = AsyncReporter.DEFAULT_TIMER_THREADS;
   private boolean singleKey = false;
   private int totalQueuedMessages = 100_000;

@@ -5,8 +5,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
 import io.github.tramchamploo.bufferslayer.internal.Component;
+import io.github.tramchamploo.bufferslayer.internal.MessageFuture;
 import java.util.concurrent.TimeUnit;
-import org.jdeferred.Promise;
 
 /**
  * Reporter that reports messages to sender
@@ -18,7 +18,7 @@ public interface Reporter<M extends Message, R> extends Component {
    *
    * @param message Message, should not be <code>null</code>.
    */
-  Promise<R, MessageDroppedException, ?> report(M message);
+  MessageFuture<R> report(M message);
 
 
   abstract class Builder<B extends Builder, M extends Message, R> {

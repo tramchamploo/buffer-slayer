@@ -6,7 +6,6 @@ import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
 import java.util.List;
 
 /**
- * Created by tramchamploo on 2017/4/12.
  * Exception raised when deferred is rejected.
  */
 public class MessageDroppedException extends RuntimeException {

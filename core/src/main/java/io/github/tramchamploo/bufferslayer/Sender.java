@@ -13,7 +13,7 @@ public interface Sender<M extends Message, R> extends Component {
   /**
    * blocking send messages
    *
-   * @param messages messages to be executed
+   * @param messages messages to be sent
    */
   List<R> send(List<M> messages);
 }

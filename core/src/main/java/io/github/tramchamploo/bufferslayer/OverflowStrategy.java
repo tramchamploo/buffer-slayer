@@ -35,7 +35,7 @@ public abstract class OverflowStrategy {
     throw new UnsupportedOperationException(name);
   }
 
-  enum Strategy {
+  public enum Strategy {
     DropHead, DropTail, DropBuffer, DropNew, Block, Fail
   }
 

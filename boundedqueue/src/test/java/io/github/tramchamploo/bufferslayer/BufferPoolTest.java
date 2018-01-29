@@ -1,9 +1,10 @@
 package io.github.tramchamploo.bufferslayer;
 
-import static io.github.tramchamploo.bufferslayer.Util.newSendingTask;
+import static io.github.tramchamploo.bufferslayer.TestMessage.newMessage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import io.github.tramchamploo.bufferslayer.internal.MessagePromise;
 import org.junit.Test;
 
 public class BufferPoolTest {
@@ -25,10 +26,10 @@ public class BufferPoolTest {
   @Test
   public void shouldLinkBuffers() {
     bufferPool = new BufferPool(2, 1, false);
-    Buffer<TestMessage> one = new Buffer<>(1, false);
-    Buffer<TestMessage> another = new Buffer<>(1, false);
-    one.accept(newSendingTask(0));
-    another.accept(newSendingTask(0));
+    Buffer one = new Buffer(1, false);
+    Buffer another = new Buffer(1, false);
+    one.accept(newPromise(0));
+    another.accept(newPromise(0));
 
     bufferPool.release(one);
     bufferPool.release(another);
@@ -41,5 +42,9 @@ public class BufferPoolTest {
     assertEquals(0, another.buffer.size());
     assertEquals(one, bufferPool.acquire());
     assertEquals(0, one.buffer.size());
+  }
+
+  private static MessagePromise<Integer> newPromise(int key) {
+    return newMessage(key).newPromise();
   }
 }

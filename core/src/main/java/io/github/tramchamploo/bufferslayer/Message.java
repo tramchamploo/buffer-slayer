@@ -1,5 +1,11 @@
 package io.github.tramchamploo.bufferslayer;
 
+import io.github.tramchamploo.bufferslayer.internal.DefaultMessagePromise;
+import io.github.tramchamploo.bufferslayer.internal.FailedMessageFuture;
+import io.github.tramchamploo.bufferslayer.internal.MessagePromise;
+import io.github.tramchamploo.bufferslayer.internal.MessageFuture;
+import io.github.tramchamploo.bufferslayer.internal.FutureListener;
+import io.github.tramchamploo.bufferslayer.internal.SucceededMessageFuture;
 import java.io.Serializable;
 
 /**
@@ -16,6 +22,31 @@ public abstract class Message implements Serializable {
    */
   @Override
   public abstract String toString();
+
+  /**
+   * Return a new {@link MessagePromise}.
+   */
+  protected <V> MessagePromise<V> newPromise() {
+    return new DefaultMessagePromise<>(this);
+  }
+
+  /**
+   * Create a new {@link MessageFuture} which is marked as succeeded already. So {@link MessageFuture#isSuccess()}
+   * will return {@code true}. All {@link FutureListener} added to it will be notified directly. Also
+   * every call of blocking methods will just return without blocking.
+   */
+  protected <V> MessageFuture<V> newSucceededFuture() {
+    return new SucceededMessageFuture<>(this, null);
+  }
+
+  /**
+   * Create a new {@link MessageFuture} which is marked as failed already. So {@link MessageFuture#isSuccess()}
+   * will return {@code false}. All {@link FutureListener} added to it will be notified directly. Also
+   * every call of blocking methods will just return without blocking.
+   */
+  protected MessageFuture<Void> newFailedFuture(Throwable cause) {
+    return new FailedMessageFuture(this, null, cause);
+  }
 
   /**
    * If singleKey is true, we will only have one pending queue with key of this instance.
@@ -56,14 +87,14 @@ public abstract class Message implements Serializable {
     /**
      * set last access time to now
      */
-    void recordAccess() {
+    synchronized void recordAccess() {
       lastAccessNanos = System.nanoTime();
     }
 
     /**
      * last time of this key accessed in nanoseconds
      */
-    long lastAccessNanos() {
+    synchronized long lastAccessNanos() {
       return lastAccessNanos;
     }
 

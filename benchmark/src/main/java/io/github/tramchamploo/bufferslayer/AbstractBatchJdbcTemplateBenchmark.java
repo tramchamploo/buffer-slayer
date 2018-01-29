@@ -1,6 +1,5 @@
 package io.github.tramchamploo.bufferslayer;
 
-import java.beans.PropertyVetoException;
 import java.util.Date;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -42,7 +41,7 @@ public abstract class AbstractBatchJdbcTemplateBenchmark {
   protected abstract Reporter<Sql, Integer> reporter(Sender<Sql, Integer> sender);
 
   @Setup
-  public void setup() throws PropertyVetoException {
+  public void setup() {
     dataSource = new DriverManagerDataSource();
     dataSource.setDriverClassName("com.mysql.jdbc.Driver");
     dataSource.setUrl(propertyOr("jdbcUrl", "jdbc:mysql://127.0.0.1:3306?useSSL=false"));

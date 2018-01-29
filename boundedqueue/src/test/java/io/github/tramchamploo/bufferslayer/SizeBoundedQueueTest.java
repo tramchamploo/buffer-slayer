@@ -6,15 +6,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import io.github.tramchamploo.bufferslayer.internal.SendingTask;
+import io.github.tramchamploo.bufferslayer.internal.Future;
+import io.github.tramchamploo.bufferslayer.internal.MessagePromise;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
-import org.jdeferred.Deferred;
-import org.jdeferred.impl.DeferredObject;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -31,23 +29,20 @@ public class SizeBoundedQueueTest {
   public void offer_failsWhenFull_size() {
     AtomicBoolean success = new AtomicBoolean(true);
     for (int i = 0; i < queue.maxSize; i++) {
-      Message next = newMessage(i);
-      queue.offer(next, new DeferredObject<>());
+      queue.offer(newPromise(i));
       assertTrue(success.get());
     }
 
-    Message shouldFail = newMessage(0);
-    Deferred<Object, MessageDroppedException, Integer> deferred = new DeferredObject<>();
-    deferred.promise().fail(obj -> success.set(false));
-    queue.offer(shouldFail, deferred);
+    MessagePromise<Integer> shouldFail = newPromise(0);
+    shouldFail.addListener(future -> success.set(false));
+    queue.offer(shouldFail);
     assertFalse(success.get());
   }
 
   @Test
   public void offer_updatesCount() {
     for (int i = 0; i < queue.maxSize; i++) {
-      Message next = newMessage(i);
-      queue.offer(next, new DeferredObject<>());
+      queue.offer(newPromise(i));
     }
     assertEquals(queue.maxSize, queue.count);
   }
@@ -56,14 +51,13 @@ public class SizeBoundedQueueTest {
   public void expectExceptionWhenFullSize_failStrategy() {
     SizeBoundedQueue queue = new SizeBoundedQueue(16, OverflowStrategy.fail);
     for (int i = 0; i < queue.maxSize; i++) {
-      Message next = newMessage(i);
-      queue.offer(next, new DeferredObject<>());
+      queue.offer(newPromise(i));
     }
 
     thrown.expect(BufferOverflowException.class);
     thrown.expectMessage("Max size of 16 is reached.");
-    Message overflow = newMessage(10);
-    queue.offer(overflow, new DeferredObject<>());
+    MessagePromise<Integer> overflow = newPromise(11);
+    queue.offer(overflow);
   }
 
   @Test
@@ -72,18 +66,17 @@ public class SizeBoundedQueueTest {
     CountDownLatch countDown = new CountDownLatch(1);
 
     for (int i = 0; i < queue.maxSize; i++) {
-      Message next = newMessage(i);
-      Deferred<Object, MessageDroppedException, Integer> deferred = new DeferredObject<>();
-      queue.offer(next, deferred);
+      MessagePromise<Integer> next = newPromise(i);
+      queue.offer(next);
       if (i == 0) {
-        deferred.fail(ex -> {
-          assertEquals(0, ((TestMessage)ex.dropped.get(0)).key);
+        next.addListener(future -> {
+          assertEquals(0, getKey(future));
           countDown.countDown();
         });
       }
     }
-    Message overflow = newMessage(queue.maxSize);
-    queue.offer(overflow, new DeferredObject<>());
+    MessagePromise<Integer> overflow = newPromise(queue.maxSize);
+    queue.offer(overflow);
     countDown.await();
 
     Object[] ids = collectKeys(queue);
@@ -96,19 +89,17 @@ public class SizeBoundedQueueTest {
     CountDownLatch countDown = new CountDownLatch(1);
 
     for (int i = 0; i < queue.maxSize; i++) {
-      Message next = newMessage(i);
-      Deferred<Object, MessageDroppedException, Integer> deferred = new DeferredObject<>();
-      queue.offer(next, deferred);
+      MessagePromise<Integer> next = newPromise(i);
+      queue.offer(next);
       if (i == queue.maxSize - 1) {
-        deferred.fail(ex -> {
-          assertEquals(queue.maxSize - 1, ((TestMessage)ex.dropped.get(0)).key);
+        next.addListener(future -> {
+          assertEquals(queue.maxSize - 1, getKey(future));
           countDown.countDown();
         });
       }
     }
-    Message overflow = newMessage(queue.maxSize);
-    Deferred<Object, MessageDroppedException, Integer> deferred = new DeferredObject<>();
-    queue.offer(overflow, deferred);
+    MessagePromise<Integer> overflow = newPromise(queue.maxSize);
+    queue.offer(overflow);
     countDown.await();
 
     Object[] ids = collectKeys(queue);
@@ -121,21 +112,21 @@ public class SizeBoundedQueueTest {
     CountDownLatch countDown = new CountDownLatch(1);
 
     for (int i = 0; i < queue.maxSize; i++) {
-      TestMessage next = newMessage(i);
-      Deferred<Object, MessageDroppedException, Integer> deferred = new DeferredObject<>();
-      queue.offer(next, deferred);
+      MessagePromise<Integer> next = newPromise(i);
+      queue.offer(next);
       if (i == 0) {
-        deferred.fail(ex -> {
-          assertEquals(16, ex.dropped.size());
+        next.addListener(future -> {
+          MessageDroppedException cause = (MessageDroppedException) future.cause();
+          assertEquals(16, cause.dropped.size());
           assertArrayEquals(new Integer[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-              ex.dropped.stream().map(d -> ((TestMessage) d).key).toArray());
+              cause.dropped.stream().map(d -> ((TestMessage) d).key).toArray());
           countDown.countDown();
         });
       }
     }
 
-    Message overflow = newMessage(queue.maxSize);
-    queue.offer(overflow, new DeferredObject<>());
+    MessagePromise<Integer> overflow = newPromise(queue.maxSize);
+    queue.offer(overflow);
     countDown.await();
 
     Object[] ids = collectKeys(queue);
@@ -146,14 +137,14 @@ public class SizeBoundedQueueTest {
   public void blockCallerWhenFull_blockStrategy() throws InterruptedException {
     SizeBoundedQueue queue = new SizeBoundedQueue(16, OverflowStrategy.block);
     for (int i = 0; i < queue.maxSize; i++) {
-      TestMessage next = newMessage(i);
-      queue.offer(next, new DeferredObject<>());
+      MessagePromise<Integer> next = newPromise(i);
+      queue.offer(next);
     }
 
     CountDownLatch countDown = new CountDownLatch(1);
     new Thread(() -> {
-      TestMessage shouldBlock = newMessage(10);
-      queue.offer(shouldBlock, new DeferredObject<>());
+      MessagePromise<Integer> shouldBlock = newPromise(10);
+      queue.offer(shouldBlock);
       countDown.countDown();
     }).start();
     assertFalse(countDown.await(10, TimeUnit.MILLISECONDS));
@@ -165,32 +156,39 @@ public class SizeBoundedQueueTest {
   public void circular() {
     SizeBoundedQueue queue = new SizeBoundedQueue(16, dropNew);
 
-    List<SendingTask> polled = new ArrayList<>();
+    List<MessagePromise> polled = new ArrayList<>();
     SizeBoundedQueue.Consumer consumer = polled::add;
 
     // Offer more than the capacity, flushing via poll on interval
     for (byte i = 0; i < 20; i++) {
-      Message next = newMessage(i);
-      queue.offer(next, new DeferredObject<>());
+      MessagePromise<Integer> next = newPromise(i);
+      queue.offer(next);
       queue.drainTo(consumer);
     }
 
     // ensure we have all of the elements
     Object[] ids = polled.stream()
-        .map(m -> ((TestMessage) m.message).key)
-        .collect(Collectors.toList())
+        .map(m -> ((TestMessage) m.message()).key)
         .toArray();
 
-    assertArrayEquals(new Object[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19}, ids);
+    assertArrayEquals(
+        new Object[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19}, ids);
+  }
+
+  private int getKey(Future<? super Integer> future) {
+    return ((TestMessage) (((MessageDroppedException) future.cause()).dropped.get(0))).key;
   }
 
   private Object[] collectKeys(SizeBoundedQueue queue) {
-    List<SendingTask> polled = new ArrayList<>();
+    List<MessagePromise> polled = new ArrayList<>();
     SizeBoundedQueue.Consumer consumer = polled::add;
     queue.drainTo(consumer);
     return polled.stream()
-        .map(m -> ((TestMessage) m.message).key)
-        .collect(Collectors.toList())
+        .map(m -> ((TestMessage) m.message()).key)
         .toArray();
+  }
+
+  private static MessagePromise<Integer> newPromise(int key) {
+    return newMessage(key).newPromise();
   }
 }

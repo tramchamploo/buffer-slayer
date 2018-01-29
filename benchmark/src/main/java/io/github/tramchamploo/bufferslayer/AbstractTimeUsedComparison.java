@@ -71,7 +71,7 @@ public abstract class AbstractTimeUsedComparison {
     }
     countDown.await();
     long used = System.nanoTime() - start;
-    System.out.println("batch time used:   " + used);
+    System.out.printf("batch time used:   %15d\n", used);
     reporter.close();
 
     unbatch.update(DROP_TABLE);
@@ -84,7 +84,7 @@ public abstract class AbstractTimeUsedComparison {
       }
     }
     used = System.nanoTime() - start;
-    System.out.println("unbatch time used: " + used);
+    System.out.printf("unbatch time used: %15d", used);
     unbatch.update(DROP_TABLE);
   }
 
