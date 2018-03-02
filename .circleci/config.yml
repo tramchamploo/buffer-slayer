@@ -1,0 +1,30 @@
+version: 2
+
+jobs:
+  build:
+    working_directory: ~/buffer-slayer
+
+    docker:
+      - image: circleci/openjdk:8-jdk-browsers
+
+    steps:
+      - checkout
+
+      - run: openssl aes-256-cbc -d -in .buildscript/secret-env-cipher -k $KEY >> ~/.circlerc
+
+      - restore_cache:
+          key: dependency-cache
+
+      - run: mvn install dependency:go-offline -DskipTests
+
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: dependency-cache
+
+      - run: mvn clean test
+
+      - store_test_results:
+          path: target/surefire-reports
+
+      - run: .buildscript/release.sh
