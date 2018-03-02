@@ -24,7 +24,11 @@ jobs:
 
       - run: mvn clean test
 
+      - run: mkdir surefire-reports
+
+      - run: find . -type f -regex ".*/target/surefire-reports/.*xml" -exec cp {} surefire-reports/ \;
+
       - store_test_results:
-          path: target/surefire-reports
+          path: surefire-reports
 
       - run: .buildscript/release.sh
