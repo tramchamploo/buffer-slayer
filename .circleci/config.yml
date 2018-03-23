@@ -10,6 +10,8 @@ jobs:
     steps:
       - checkout
 
+      - run: export GPG_TTY=$(tty)
+
       - run: openssl aes-256-cbc -d -in .buildscript/secret-env-cipher -k $KEY >> $BASH_ENV
 
       - restore_cache:
