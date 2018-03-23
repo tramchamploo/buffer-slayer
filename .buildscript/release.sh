@@ -32,6 +32,8 @@ EOF
   # Checkout before commit
   git pull origin
 
+  # https://issues.apache.org/jira/browse/MGPG-59?attachmentOrder=desc
+  echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
   mvn -B release:prepare --settings=".buildscript/settings.xml" -Prelease -DreleaseVersion=$RELEASE -DdevelopmentVersion=$NEXT -Darguments="-DskipTests"
 
   if [ $? -eq 0 ]; then
