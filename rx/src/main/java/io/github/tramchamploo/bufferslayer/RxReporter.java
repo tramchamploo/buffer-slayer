@@ -87,12 +87,42 @@ public class RxReporter<M extends Message, R> implements Reporter<M, R>, Flowabl
     metrics.incrementMessagesDropped(quantity);
   }
 
-  public static final class Builder<M extends Message, R> extends Reporter.Builder<Builder<M, R>, M, R> {
+  public static final class Builder<M extends Message, R> extends Reporter.Builder<M, R> {
 
     Scheduler scheduler = Schedulers.io();
 
     Builder(Sender<M, R> sender) {
       super(sender);
+    }
+
+    @Override
+    public Builder<M, R> metrics(ReporterMetrics metrics) {
+      super.metrics(metrics);
+      return this;
+    }
+
+    @Override
+    public Builder<M, R> messageTimeout(long timeout, TimeUnit unit) {
+      super.messageTimeout(timeout, unit);
+      return this;
+    }
+
+    @Override
+    public Builder<M, R> bufferedMaxMessages(int bufferedMaxMessages) {
+      super.bufferedMaxMessages(bufferedMaxMessages);
+      return this;
+    }
+
+    @Override
+    public Builder<M, R> pendingMaxMessages(int pendingMaxMessages) {
+      super.pendingMaxMessages(pendingMaxMessages);
+      return this;
+    }
+
+    @Override
+    public Builder<M, R> overflowStrategy(Strategy overflowStrategy) {
+      super.overflowStrategy(overflowStrategy);
+      return this;
     }
 
     public Builder<M, R> scheduler(Scheduler scheduler) {

@@ -9,7 +9,6 @@ import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
 import java.util.LinkedList;
 import java.util.List;
 
-@SuppressWarnings("unchecked")
 public final class Promises {
 
   /**
@@ -38,12 +37,12 @@ public final class Promises {
   /**
    * Set a failed result to all promises
    */
-  public static void allFail(List<MessagePromise> promises, Strategy overflowStrategy) {
+  public static void allFail(List<MessagePromise<?>> promises, Strategy overflowStrategy) {
     List<Message> messages = new LinkedList<>();
-    for (MessagePromise promise : promises) {
+    for (MessagePromise<?> promise : promises) {
       messages.add(promise.message());
     }
-    for (MessagePromise promise : promises) {
+    for (MessagePromise<?> promise : promises) {
       promise.setFailure(dropped(overflowStrategy, messages));
     }
   }

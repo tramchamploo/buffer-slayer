@@ -13,7 +13,8 @@ import org.springframework.jdbc.core.PreparedStatementSetter;
  * Represent sql to be sent
  */
 public final class Sql extends Message {
-
+  private static final long serialVersionUID = 845870486130911488L;
+  
   final String sql;
   transient final PreparedStatementSetter statementSetter;
   transient Object[] args;

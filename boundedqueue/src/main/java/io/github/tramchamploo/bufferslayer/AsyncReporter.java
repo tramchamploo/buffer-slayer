@@ -7,6 +7,7 @@ import static java.util.Collections.singletonList;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
+import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
 import io.github.tramchamploo.bufferslayer.QueueManager.Callback;
 import io.github.tramchamploo.bufferslayer.internal.CompositeFuture;
 import io.github.tramchamploo.bufferslayer.internal.Future;
@@ -95,7 +96,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     return new Builder<>(sender);
   }
 
-  public static final class Builder<M extends Message, R> extends Reporter.Builder<Builder<M, R>, M, R> {
+  public static final class Builder<M extends Message, R> extends Reporter.Builder<M, R> {
 
     int sharedSenderThreads = 1;
     int flushThreads = DEFAULT_FLUSH_THREADS;
@@ -106,6 +107,36 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
 
     Builder(Sender<M, R> sender) {
       super(sender);
+    }
+
+    @Override
+    public Builder<M, R> metrics(ReporterMetrics metrics) {
+      super.metrics(metrics);
+      return this;
+    }
+
+    @Override
+    public Builder<M, R> messageTimeout(long timeout, TimeUnit unit) {
+      super.messageTimeout(timeout, unit);
+      return this;
+    }
+
+    @Override
+    public Builder<M, R> bufferedMaxMessages(int bufferedMaxMessages) {
+      super.bufferedMaxMessages(bufferedMaxMessages);
+      return this;
+    }
+
+    @Override
+    public Builder<M, R> pendingMaxMessages(int pendingMaxMessages) {
+      super.pendingMaxMessages(pendingMaxMessages);
+      return this;
+    }
+
+    @Override
+    public Builder<M, R> overflowStrategy(Strategy overflowStrategy) {
+      super.overflowStrategy(overflowStrategy);
+      return this;
     }
 
     public Builder<M, R> sharedSenderThreads(int senderThreads) {
@@ -228,7 +259,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     future.addListener(new FutureListener<R>() {
 
       @Override
-      public void operationComplete(Future future) {
+      public void operationComplete(Future<R> future) {
         if (!future.isSuccess()) {
           metrics.incrementMessagesDropped(1);
         }
@@ -244,18 +275,17 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     }
   }
 
-  @SuppressWarnings("unchecked")
   Future<?> flush(SizeBoundedQueue pending) {
     // Remove overtime queues and relative metrics and timer
     List<MessageKey> shrinked = queueManager.shrink();
     clearMetricsAndTimer(shrinked);
-
+    
     CompositeFuture result;
     Buffer buffer = bufferPool.acquire();
     try {
       int drained = pending.drainTo(buffer);
       if (drained == 0) {
-        return new SucceededFuture(null, null);
+        return new SucceededFuture<>(null, null);
       }
 
       List<MessagePromise<R>> promises = buffer.drain();

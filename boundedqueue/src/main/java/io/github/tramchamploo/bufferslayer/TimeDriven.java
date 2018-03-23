@@ -17,9 +17,9 @@ abstract class TimeDriven<K> {
 
   class Timer {
     final long id;
-    final Future task;
+    final Future<?> task;
 
-    Timer(long id, Future task) {
+    Timer(long id, Future<?> task) {
       this.id = id;
       this.task = task;
     }
