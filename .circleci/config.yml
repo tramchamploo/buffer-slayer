@@ -10,8 +10,6 @@ jobs:
     steps:
       - checkout
 
-      - run: echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
-
       - run: openssl aes-256-cbc -d -in .buildscript/secret-env-cipher -k $KEY >> $BASH_ENV
 
       - restore_cache:
