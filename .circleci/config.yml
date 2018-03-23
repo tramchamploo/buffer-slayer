@@ -10,7 +10,7 @@ jobs:
     steps:
       - checkout
 
-      - run: openssl aes-256-cbc -d -in .buildscript/secret-env-cipher -k $KEY >> ~/.circlerc
+      - run: openssl aes-256-cbc -d -in .buildscript/secret-env-cipher -k $KEY >> $BASH_ENV
 
       - restore_cache:
           key: dependency-cache
