@@ -23,5 +23,8 @@ hs_err_pid*
 .gitignore
 bin
 
+# VS Code
+.vscode
+
 # OS X
 .DS_Store

@@ -3,7 +3,7 @@ package io.github.tramchamploo.bufferslayer;
 import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
 import java.util.concurrent.TimeUnit;
 
-public abstract class AbstractReporterProperties<T extends AbstractReporterProperties> implements ReporterProperties<T> {
+public abstract class AbstractReporterProperties implements ReporterProperties {
 
   protected Sender<? extends Message, ?> sender;
   protected String metrics = "noop";
@@ -13,76 +13,60 @@ public abstract class AbstractReporterProperties<T extends AbstractReporterPrope
   protected int pendingMaxMessages = 10000;
   protected String overflowStrategy = Strategy.DropHead.name();
 
-  public Sender<? extends Message, ?> getSender() {
-    return sender;
-  }
-
-  public T setSender(Sender<? extends Message, ?> sender) {
-    this.sender = sender;
-    return self();
-  }
-
   public String getMetrics() {
     return metrics;
   }
 
-  public T setMetrics(String metrics) {
+  public AbstractReporterProperties setMetrics(String metrics) {
     if (!metrics.equalsIgnoreCase("inmemory")) {
       throw new UnsupportedOperationException(metrics);
     }
     this.metrics = metrics;
-    return self();
+    return this;
   }
 
   public long getMessageTimeoutNanos() {
     return messageTimeoutNanos;
   }
 
-  public T setMessageTimeout(long messageTimeout, TimeUnit unit) {
+  public AbstractReporterProperties setMessageTimeout(long messageTimeout, TimeUnit unit) {
     this.messageTimeoutNanos = unit.toNanos(messageTimeout);
-    return self();
+    return this;
   }
 
   public int getBufferedMaxMessages() {
     return bufferedMaxMessages;
   }
 
-  public T setBufferedMaxMessages(int bufferedMaxMessages) {
+  public AbstractReporterProperties setBufferedMaxMessages(int bufferedMaxMessages) {
     this.bufferedMaxMessages = bufferedMaxMessages;
-    return self();
+    return this;
   }
 
   public int getPendingMaxMessages() {
     return pendingMaxMessages;
   }
 
-  public T setPendingMaxMessages(int pendingMaxMessages) {
+  public AbstractReporterProperties setPendingMaxMessages(int pendingMaxMessages) {
     this.pendingMaxMessages = pendingMaxMessages;
-    return self();
-  }
-
-  public T setMetricsExporter(String exporter) {
-    this.metricsExporter = exporter;
-    return self();
+    return this;
   }
 
   public String getMetricsExporter() {
     return metricsExporter;
   }
 
+  public AbstractReporterProperties setMetricsExporter(String exporter) {
+    this.metricsExporter = exporter;
+    return this;
+  }
+
   public String getOverflowStrategy() {
     return overflowStrategy;
   }
 
-  public T setOverflowStrategy(String overflowStrategy) {
+  public AbstractReporterProperties setOverflowStrategy(String overflowStrategy) {
     this.overflowStrategy = overflowStrategy;
-    return self();
+    return this;
   }
-
-  @SuppressWarnings("unchecked")
-  T self() {
-    return (T) this;
-  }
-
-  public abstract Reporter.Builder toBuilder();
 }

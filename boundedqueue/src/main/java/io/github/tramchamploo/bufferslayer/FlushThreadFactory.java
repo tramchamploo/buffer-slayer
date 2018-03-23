@@ -11,11 +11,11 @@ class FlushThreadFactory {
 
   static Logger logger = AsyncReporter.logger;
 
-  final AsyncReporter reporter;
+  final AsyncReporter<?, ?> reporter;
   final FlushSynchronizer synchronizer;
   final ThreadFactory factory;
 
-  FlushThreadFactory(AsyncReporter reporter) {
+  FlushThreadFactory(AsyncReporter<?, ?> reporter) {
     this.reporter = reporter;
     this.synchronizer = reporter.synchronizer;
     this.factory = new ThreadFactoryBuilder()
@@ -48,7 +48,6 @@ class FlushThreadFactory {
     });
   }
 
-  @SuppressWarnings("unchecked")
   private void reScheduleAndFlush(SizeBoundedQueue q) {
     try {
       while (q.size() >= reporter.bufferedMaxMessages) {

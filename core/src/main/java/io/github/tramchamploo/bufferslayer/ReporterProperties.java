@@ -1,14 +1,9 @@
 package io.github.tramchamploo.bufferslayer;
 
-public interface ReporterProperties<T extends ReporterProperties> {
-
-  /**
-   * Set the sender for reporter
-   */
-  T setSender(Sender<? extends Message, ?> sender);
+public interface ReporterProperties {
 
   /**
    * Construct a {@link io.github.tramchamploo.bufferslayer.Reporter.Builder} using properties
    */
-  Reporter.Builder toBuilder();
+  <M extends Message, R> Reporter.Builder<M, R> toBuilder(Sender<M, R> sender);
 }

@@ -21,7 +21,7 @@ public interface Reporter<M extends Message, R> extends Component {
   MessageFuture<R> report(M message);
 
 
-  abstract class Builder<B extends Builder, M extends Message, R> {
+  abstract class Builder<M extends Message, R> {
 
     final Sender<M, R> sender;
     ReporterMetrics metrics = ReporterMetrics.NOOP_METRICS;
@@ -35,39 +35,34 @@ public interface Reporter<M extends Message, R> extends Component {
       this.sender = sender;
     }
 
-    public B metrics(ReporterMetrics metrics) {
+    public Builder<M, R> metrics(ReporterMetrics metrics) {
       this.metrics = checkNotNull(metrics, "metrics");
-      return self();
+      return this;
     }
 
-    public B messageTimeout(long timeout, TimeUnit unit) {
+    public Builder<M, R> messageTimeout(long timeout, TimeUnit unit) {
       checkArgument(timeout >= 0, "timeout >= 0: %s", timeout);
       this.messageTimeoutNanos = unit.toNanos(timeout);
-      return self();
+      return this;
     }
 
-    public B bufferedMaxMessages(int bufferedMaxMessages) {
+    public Builder<M, R> bufferedMaxMessages(int bufferedMaxMessages) {
       checkArgument(bufferedMaxMessages > 0, "bufferedMaxMessages > 0: %s", bufferedMaxMessages);
       this.bufferedMaxMessages = bufferedMaxMessages;
-      return self();
+      return this;
     }
 
-    public B pendingMaxMessages(int pendingMaxMessages) {
+    public Builder<M, R> pendingMaxMessages(int pendingMaxMessages) {
       checkArgument(pendingMaxMessages > 0, "pendingMaxMessages > 0: %s", pendingMaxMessages);
       this.pendingMaxMessages = pendingMaxMessages;
-      return self();
+      return this;
     }
 
-    public B overflowStrategy(Strategy overflowStrategy) {
+    public Builder<M, R> overflowStrategy(Strategy overflowStrategy) {
       this.overflowStrategy = overflowStrategy;
-      return self();
+      return this;
     }
 
     public abstract Reporter<M, R> build();
-
-    @SuppressWarnings("unchecked")
-    B self() {
-      return (B) this;
-    }
   }
 }

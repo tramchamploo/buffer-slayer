@@ -3,7 +3,7 @@ package io.github.tramchamploo.bufferslayer;
 import io.github.tramchamploo.bufferslayer.AsyncReporter.Builder;
 import java.util.concurrent.TimeUnit;
 
-public class AsyncReporterProperties extends AbstractReporterProperties<AsyncReporterProperties> {
+public class AsyncReporterProperties extends AbstractReporterProperties {
 
   private int sharedSenderThreads = 1;
   private long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
@@ -12,13 +12,49 @@ public class AsyncReporterProperties extends AbstractReporterProperties<AsyncRep
   private boolean singleKey = false;
   private int totalQueuedMessages = 100_000;
 
+  @Override
+  public AsyncReporterProperties setMetrics(String metrics) {
+    super.setMetrics(metrics);
+    return this;
+  }
+
+  @Override
+  public AsyncReporterProperties setMessageTimeout(long messageTimeout, TimeUnit unit) {
+    super.setMessageTimeout(messageTimeout, unit);
+    return this;
+  }
+
+  @Override
+  public AsyncReporterProperties setBufferedMaxMessages(int bufferedMaxMessages) {
+    super.setBufferedMaxMessages(bufferedMaxMessages);
+    return this;
+  }
+
+  @Override
+  public AsyncReporterProperties setPendingMaxMessages(int pendingMaxMessages) {
+    super.setPendingMaxMessages(pendingMaxMessages);
+    return this;
+  }
+
+  @Override
+  public AsyncReporterProperties setMetricsExporter(String exporter) {
+    super.setMetricsExporter(exporter);
+    return this;
+  }
+
+  @Override
+  public AsyncReporterProperties setOverflowStrategy(String overflowStrategy) {
+    super.setOverflowStrategy(overflowStrategy);
+    return this;
+  }
+
   public int getSharedSenderThreads() {
     return sharedSenderThreads;
   }
 
   public AsyncReporterProperties setSharedSenderThreads(int sharedSenderThreads) {
     this.sharedSenderThreads = sharedSenderThreads;
-    return self();
+    return this;
   }
 
   public long getPendingKeepaliveNanos() {
@@ -27,7 +63,7 @@ public class AsyncReporterProperties extends AbstractReporterProperties<AsyncRep
 
   public AsyncReporterProperties setPendingKeepaliveNanos(long pendingKeepalive, TimeUnit unit) {
     this.pendingKeepaliveNanos = unit.toNanos(pendingKeepalive);
-    return self();
+    return this;
   }
 
   public int getFlushThreads() {
@@ -36,7 +72,7 @@ public class AsyncReporterProperties extends AbstractReporterProperties<AsyncRep
 
   public AsyncReporterProperties setFlushThreads(int flushThreads) {
     this.flushThreads = flushThreads;
-    return self();
+    return this;
   }
 
   public int getTimerThreads() {
@@ -45,12 +81,12 @@ public class AsyncReporterProperties extends AbstractReporterProperties<AsyncRep
 
   public AsyncReporterProperties setTimerThreads(int timerThreads) {
     this.timerThreads = timerThreads;
-    return self();
+    return this;
   }
 
   public AsyncReporterProperties setSingleKey(boolean singleKey) {
     this.singleKey = singleKey;
-    return self();
+    return this;
   }
 
   public boolean isSingleKey() {
@@ -66,8 +102,9 @@ public class AsyncReporterProperties extends AbstractReporterProperties<AsyncRep
     return this;
   }
 
-  public Builder toBuilder() {
-    Builder builder = new Builder<>(sender).sharedSenderThreads(sharedSenderThreads)
+  @Override
+  public <M extends Message, R> Builder<M, R> toBuilder(Sender<M, R> sender) {
+    Builder<M, R> builder = new Builder<>(sender).sharedSenderThreads(sharedSenderThreads)
                                            .messageTimeout(messageTimeoutNanos, TimeUnit.NANOSECONDS)
                                            .pendingKeepalive(pendingKeepaliveNanos, TimeUnit.NANOSECONDS)
                                            .flushThreads(flushThreads)

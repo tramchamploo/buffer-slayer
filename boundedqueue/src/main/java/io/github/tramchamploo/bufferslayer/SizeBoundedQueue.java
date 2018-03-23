@@ -22,7 +22,6 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  * <p>This is similar to {@link java.util.concurrent.ArrayBlockingQueue} in implementation.
  */
-@SuppressWarnings("unchecked")
 final class SizeBoundedQueue {
 
   interface Consumer {
@@ -30,7 +29,7 @@ final class SizeBoundedQueue {
     /**
      * Returns true if it accepted the next element
      */
-    boolean accept(MessagePromise next);
+    boolean accept(MessagePromise<?> next);
   }
 
   private static final int DEFAULT_CAPACITY = 10;
@@ -42,7 +41,7 @@ final class SizeBoundedQueue {
   final int maxSize;
   final MessageKey key;
 
-  private MessagePromise[] elements;
+  private MessagePromise<?>[] elements;
   private int writePos;
   private int readPos;
   int count;
@@ -67,7 +66,7 @@ final class SizeBoundedQueue {
    * Notify deferred if the element could be added or reject if it could not due to its
    * {@link OverflowStrategy.Strategy}.
    */
-  void offer(MessagePromise promise) {
+  void offer(MessagePromise<?> promise) {
     Message message = promise.message();
 
     lock.lock();
@@ -79,17 +78,17 @@ final class SizeBoundedQueue {
             promise.setFailure(dropped(DropNew, message));
             return;
           case DropTail:
-            MessagePromise tail = dropTail();
+            MessagePromise<?> tail = dropTail();
             enqueue(promise);
             tail.setFailure(dropped(DropTail, tail.message()));
             return;
           case DropHead:
-            MessagePromise head = dropHead();
+            MessagePromise<?> head = dropHead();
             enqueue(promise);
             head.setFailure(dropped(DropHead, head.message()));
             return;
           case DropBuffer:
-            List<MessagePromise> allElements = removeAll();
+            List<MessagePromise<?>> allElements = removeAll();
             doClear();
             enqueue(promise);
             Promises.allFail(allElements, DropBuffer);
@@ -137,11 +136,11 @@ final class SizeBoundedQueue {
   /**
    * Drop the last element
    */
-  private MessagePromise dropTail() {
+  private MessagePromise<?> dropTail() {
     if (--writePos == -1) {
       writePos = elements.length - 1; // circle forward to the end of the array
     }
-    MessagePromise tail = elements[writePos];
+    MessagePromise<?> tail = elements[writePos];
     elements[writePos] = null;
     count--;
     notFull.signal();
@@ -151,8 +150,8 @@ final class SizeBoundedQueue {
   /**
    * Drop the first element
    */
-  private MessagePromise dropHead() {
-    MessagePromise head = elements[readPos];
+  private MessagePromise<?> dropHead() {
+    MessagePromise<?> head = elements[readPos];
     elements[readPos] = null;
     if (++readPos == elements.length) {
       readPos = 0; // circle back to the front of the array
@@ -162,7 +161,7 @@ final class SizeBoundedQueue {
     return head;
   }
 
-  private void enqueue(MessagePromise next) {
+  private void enqueue(MessagePromise<?> next) {
     try {
       while (isFull()) {
         notFull.await();
@@ -188,11 +187,11 @@ final class SizeBoundedQueue {
     _benchmark = benchmark;
   }
 
-  private List<MessagePromise> removeAll() {
-    final List<MessagePromise> result = new LinkedList<>();
+  private List<MessagePromise<?>> removeAll() {
+    final List<MessagePromise<?>> result = new LinkedList<>();
     doDrain(new Consumer() {
       @Override
-      public boolean accept(MessagePromise next) {
+      public boolean accept(MessagePromise<?> next) {
         return result.add(next);
       }
     });
@@ -208,12 +207,11 @@ final class SizeBoundedQueue {
     }
   }
 
-  @SuppressWarnings("unchecked")
   private int doDrain(Consumer consumer) {
     int drainedCount = 0;
 
     while (drainedCount < count) {
-      MessagePromise next = elements[readPos];
+      MessagePromise<?> next = elements[readPos];
 
       if (next == null) {
         break;

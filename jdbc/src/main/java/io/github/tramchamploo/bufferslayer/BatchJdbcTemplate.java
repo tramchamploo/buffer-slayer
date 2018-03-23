@@ -45,7 +45,7 @@ public class BatchJdbcTemplate {
   @SuppressWarnings("unchecked")
   public BatchJdbcTemplate(JdbcTemplate delegate, ReporterProperties properties) {
     this.delegate = delegate;
-    this.reporter = properties.setSender(new JdbcTemplateSender(delegate)).toBuilder().build();
+    this.reporter = properties.toBuilder(new JdbcTemplateSender(delegate)).build();
   }
 
   public void setNativeJdbcExtractor(NativeJdbcExtractor extractor) {

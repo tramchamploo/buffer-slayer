@@ -13,7 +13,7 @@ public abstract class CompositeFuture extends AbstractFuture<CompositeFuture> {
    * <p/>
    * When the list is empty, the returned future will be already completed.
    */
-  public static CompositeFuture all(List<? extends Future> futures) {
+  public static CompositeFuture all(List<? extends Future<?>> futures) {
     return DefaultCompositeFuture.all(futures.toArray(new Future[futures.size()]));
   }
 

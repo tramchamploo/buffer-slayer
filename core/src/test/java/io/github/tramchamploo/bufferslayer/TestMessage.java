@@ -1,7 +1,8 @@
 package io.github.tramchamploo.bufferslayer;
 
 public class TestMessage extends Message {
-
+  private static final long serialVersionUID = 845870486130911489L;
+  
   final int key;
   private TestMessage(int key) {
     this.key = key;

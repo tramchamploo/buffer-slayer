@@ -9,6 +9,7 @@ import java.util.List;
  * Exception raised when deferred is rejected.
  */
 public class MessageDroppedException extends RuntimeException {
+  private static final long serialVersionUID = -375805702767069544L;
 
   final List<? extends Message> dropped;
   final boolean overflow;

@@ -27,7 +27,7 @@ final class Buffer implements SizeBoundedQueue.Consumer {
   }
 
   @Override
-  public boolean accept(MessagePromise next) {
+  public boolean accept(MessagePromise<?> next) {
     if (bufferFull) {
       return false;
     }
