@@ -13,19 +13,21 @@ fi
 if [[ $RELEASE ]]; then
   # Generate a gpg key
   cat > gen-key-script <<EOF
-       Key-Type: RSA
-       Subkey-Type: RSA
-       Name-Real: buffer-slayer
-       Name-Comment: buffer-slayer deployment key
-       Name-Email: tramchamploo@gmail.com
-       Expire-Date: 0
-       Passphrase: $GPG_PASSPHRASE
+Key-Type: RSA
+Subkey-Type: RSA
+Name-Real: buffer-slayer
+Name-Comment: buffer-slayer deployment key
+Name-Email: tramchamploo@gmail.com
+Expire-Date: 0
+Passphrase: $GPG_PASSPHRASE
 EOF
   gpg --batch --gen-key gen-key-script
   rm gen-key-script
 
   # Publish public key to key server
   key_id=$(gpg --list-keys | grep -B1 buffer-slayer | head -1 | awk '{print $2}' | awk -F '/' '{print $2}')
+
+  echo "Sending gpg key to keyserver... id: $key_id"
   gpg --keyserver hkp://keyserver.ubuntu.com --send-keys $key_id
   gpg --keyserver hkp://pool.sks-keyservers.net --send-keys $key_id
 
