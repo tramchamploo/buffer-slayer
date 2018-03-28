@@ -1,5 +1,5 @@
 [![CircleCI](https://circleci.com/gh/tramchamploo/buffer-slayer.svg?style=shield)](https://circleci.com/gh/tramchamploo/buffer-slayer)
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.github.tramchamploo/bufferslayer-core/badge.svg)](https://maven-badges.herokuapp.com/maven-central/io.github.tramchamploo/bufferslayer-core)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.tramchamploo/bufferslayer-parent.svg)](https://search.maven.org/#search%7Cga%7C1%7Cbufferslayer)
 [ ![Download](https://api.bintray.com/packages/tramchamploo/tramchamploo/buffer-slayer/images/download.svg) ](https://bintray.com/tramchamploo/tramchamploo/buffer-slayer/_latestVersion)
 
 # buffer-slayer
