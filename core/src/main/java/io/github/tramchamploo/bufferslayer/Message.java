@@ -82,19 +82,19 @@ public abstract class Message implements Serializable {
    */
   public static abstract class MessageKey {
 
-    private long lastAccessNanos = System.nanoTime();
+    private volatile long lastAccessNanos = System.nanoTime();
 
     /**
      * set last access time to now
      */
-    synchronized void recordAccess() {
+    void recordAccess() {
       lastAccessNanos = System.nanoTime();
     }
 
     /**
      * last time of this key accessed in nanoseconds
      */
-    synchronized long lastAccessNanos() {
+    long lastAccessNanos() {
       return lastAccessNanos;
     }
 
