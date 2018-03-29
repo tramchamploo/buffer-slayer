@@ -15,7 +15,6 @@ final class SenderConsumerBridge {
   /**
    * Adapt a {@link Sender} to rx-java's {@link Consumer}
    */
-  @SuppressWarnings("unchecked")
   static <M extends Message, R> Consumer<List<MessagePromise<R>>> toConsumer(final Sender<M, R> sender) {
     return new Consumer<List<MessagePromise<R>>>() {
       @Override
