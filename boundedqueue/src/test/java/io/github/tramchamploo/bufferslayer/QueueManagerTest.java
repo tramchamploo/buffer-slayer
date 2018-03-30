@@ -17,22 +17,24 @@ public class QueueManagerTest {
 
   QueueManager manager;
 
-  static MessageKey testKey = new MessageKey() {
-    @Override
-    public int hashCode() {
-      return 0;
-    }
+  static MessageKey testKey() {
+    return new MessageKey() {
+      @Override
+      public int hashCode() {
+        return 0;
+      }
 
-    @Override
-    public boolean equals(Object obj) {
-      return true;
-    }
+      @Override
+      public boolean equals(Object obj) {
+        return true;
+      }
 
-    @Override
-    public String toString() {
-      return "testKey";
-    }
-  };
+      @Override
+      public String toString() {
+        return "testKey";
+      }
+    };
+  }
 
   @Before
   public void setup() {
@@ -42,8 +44,8 @@ public class QueueManagerTest {
   
   @Test
   public void getAfterCreate() {
-    SizeBoundedQueue q = manager.getOrCreate(testKey);
-    assertEquals(q, manager.getOrCreate(testKey));
+    SizeBoundedQueue q = manager.getOrCreate(testKey());
+    assertEquals(q, manager.getOrCreate(testKey()));
   }
 
   @Test
@@ -53,32 +55,32 @@ public class QueueManagerTest {
     manager.onCreate(new Callback() {
       @Override
       public void call(SizeBoundedQueue queue) {
-        assertEquals(testKey, queue.key);
+        assertEquals(testKey(), queue.key);
         callCount.incrementAndGet();
         countDown.countDown();
       }
     });
-    manager.getOrCreate(testKey);
+    manager.getOrCreate(testKey());
     countDown.await();
-    manager.getOrCreate(testKey);
+    manager.getOrCreate(testKey());
     // only triggered once created
     assertEquals(1, callCount.get());
   }
 
   @Test
   public void keepAlive() throws InterruptedException {
-    SizeBoundedQueue q = manager.getOrCreate(testKey);
+    SizeBoundedQueue q = manager.getOrCreate(testKey());
     TimeUnit.MILLISECONDS.sleep(10);
 
-    assertEquals(testKey, manager.shrink().get(0));
+    assertEquals(testKey(), manager.shrink().get(0));
     assertEquals(0, manager.keyToQueue.size());
-    SizeBoundedQueue q1 = manager.getOrCreate(testKey);
+    SizeBoundedQueue q1 = manager.getOrCreate(testKey());
     assertNotEquals(q, q1);
 
     TimeUnit.MILLISECONDS.sleep(10);
-    manager.getOrCreate(testKey);
+    manager.getOrCreate(testKey());
     assertEquals(1, manager.keyToQueue.size());
-    assertEquals(q1, manager.getOrCreate(testKey));
+    assertEquals(q1, manager.getOrCreate(testKey()));
   }
 
   @Test

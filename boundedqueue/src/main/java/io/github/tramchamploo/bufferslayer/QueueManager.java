@@ -75,7 +75,7 @@ class QueueManager {
         queue = prev;
       }
     }
-    key.recordAccess();
+    queue.recordAccess();
     return queue;
   }
 
@@ -103,7 +103,7 @@ class QueueManager {
         MessageKey key = entry.getKey();
         SizeBoundedQueue q = entry.getValue();
 
-        if (now() - key.lastAccessNanos() > pendingKeepaliveNanos) {
+        if (now() - q.lastAccessNanos() > pendingKeepaliveNanos) {
           if (q.count > 0) continue;
           iter.remove();
           result.add(key);
