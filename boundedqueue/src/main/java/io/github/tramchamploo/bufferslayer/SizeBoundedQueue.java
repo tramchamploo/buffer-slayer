@@ -49,6 +49,8 @@ final class SizeBoundedQueue {
   // Set promise success if true, only used in benchmark
   private boolean _benchmark = false;
 
+  private volatile long lastAccessNanos = System.nanoTime();
+
   SizeBoundedQueue(int maxSize, Strategy overflowStrategy, MessageKey key) {
     int initialCapacity = DEFAULT_CAPACITY > maxSize ? maxSize : DEFAULT_CAPACITY;
     this.elements = new MessagePromise[initialCapacity];
@@ -265,5 +267,21 @@ final class SizeBoundedQueue {
     } finally {
       lock.unlock();
     }
+  }
+
+  /**
+   * set last access time to now
+   */
+  void recordAccess() {
+    if (key != Message.SINGLE_KEY) {
+      lastAccessNanos = System.nanoTime();
+    }
+  }
+
+  /**
+   * last time of this key accessed in nanoseconds
+   */
+  long lastAccessNanos() {
+    return key == Message.SINGLE_KEY ? Long.MAX_VALUE : lastAccessNanos;
   }
 }
