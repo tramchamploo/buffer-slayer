@@ -47,15 +47,18 @@ abstract class MemoryLimiter {
 
     @Override
     void waitWhenMaximum() {
-      lock.lock();
-      try {
-        while (isMaximum()) {
-          notFull.await();
+      if (isMaximum()) {
+        lock.lock();
+        try {
+          while (isMaximum()) {
+            notFull.await();
+          }
+        } catch (InterruptedException e) {
+          logger.error("Interrupted waiting when full.");
+          Thread.currentThread().interrupt();
+        } finally {
+          lock.unlock();
         }
-      } catch (InterruptedException e) {
-        logger.error("Interrupted waiting when full.");
-      } finally {
-        lock.unlock();
       }
     }
 
