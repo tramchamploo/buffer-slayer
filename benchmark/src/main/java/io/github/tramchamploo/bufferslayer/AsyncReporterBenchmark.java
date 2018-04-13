@@ -20,17 +20,21 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @State(Scope.Group)
-@SuppressWarnings("unchecked")
 public class AsyncReporterBenchmark extends AbstractReporterBenchmark {
 
   @Override
-  protected Reporter getReporter() {
+  protected Reporter<Message, ?> getReporter() {
     return AsyncReporter.builder(sender)
         .pendingMaxMessages(100)
         .totalQueuedMessages(100)
         .metrics(metrics)
         .messageTimeout(1000, TimeUnit.NANOSECONDS)
         .build();
+  }
+
+  @Override
+  protected void doClear() {
+    ((AsyncReporter) reporter).clearPendings();
   }
 
   public static void main(String[] args) throws RunnerException {

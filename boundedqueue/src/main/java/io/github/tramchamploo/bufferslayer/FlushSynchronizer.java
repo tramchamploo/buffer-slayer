@@ -1,26 +1,18 @@
 package io.github.tramchamploo.bufferslayer;
 
-import io.github.tramchamploo.bufferslayer.Message.MessageKey;
-import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.LockSupport;
 
 /**
- * <p>Flush threads should block when no pending queue has more elements
- * than {@code bufferedMaxMessages}.
+ * <p>Flush threads should be notified when pending queue has more elements
+ * than {@code bufferedMaxMessages} using this flush synchronizer.
  */
 class FlushSynchronizer {
 
-  private final Lock lock = new ReentrantLock();
-  private final Condition available = lock.newCondition();
-  // Use a HashMap to faster the existence check of queues
-  final Map<MessageKey, Object> keyToReady = new HashMap<>();
-  private static final Object READY = new Object();
-
-  ArrayDeque<SizeBoundedQueue> deque = new ArrayDeque<>();
+  final Queue<SizeBoundedQueue> queue = new ConcurrentLinkedQueue<>();
+  // Threads that waiting to poll
+  private final Queue<Thread> waiters = new ConcurrentLinkedQueue<>();
 
   /**
    * Offer a queue here in order to make flush threads have something to drain
@@ -28,18 +20,17 @@ class FlushSynchronizer {
    * @param q queue to offer
    */
   boolean offer(SizeBoundedQueue q) {
-    lock.lock();
-    try {
-      if (!keyToReady.containsKey(q.key)) {
-        keyToReady.put(q.key, READY);
-        boolean result = deque.offer(q);
-        available.signal();
-        return result;
-      }
-    } finally {
-      lock.unlock();
+    if (q.ready) {
+      return false;
     }
-    return false;
+
+    q.ready = true;
+    boolean result = queue.offer(q);
+    Thread top = waiters.poll();
+    if (top != null) {
+      LockSupport.unpark(top);
+    }
+    return result;
   }
 
   /**
@@ -47,42 +38,49 @@ class FlushSynchronizer {
    * @param timeoutNanos if reaches this timeout and no queue appears, return null
    * @return the first queue offered
    */
-  SizeBoundedQueue poll(long timeoutNanos) throws InterruptedException {
-    lock.lock();
-    try {
-      long nanosLeft = timeoutNanos;
-      while (deque.isEmpty()) {
-        if (nanosLeft <= 0) return null;
-        nanosLeft = available.awaitNanos(nanosLeft);
+  SizeBoundedQueue poll(long timeoutNanos) {
+    final long deadline = System.nanoTime() + timeoutNanos;
+
+    boolean wasInterrupted = false;
+    boolean queued = false;
+    Thread current = Thread.currentThread();
+
+    while (queue.isEmpty()) {
+      timeoutNanos = deadline - System.nanoTime();
+      if (timeoutNanos <= 0L) {
+        return null;
       }
-      return deque.poll();
-    } finally {
-      lock.unlock();
+
+      if (!queued) {
+        waiters.offer(current);
+        queued = true;
+      }
+
+      LockSupport.parkNanos(this, timeoutNanos);
+      if (Thread.interrupted()) {
+        wasInterrupted = true;
+      }
     }
+
+    if (wasInterrupted) {
+      current.interrupt();
+    }
+
+    return queue.poll();
   }
 
   /**
    * Remove the key from the map so it can be offered again
    */
   void release(SizeBoundedQueue q) {
-    lock.lock();
-    try {
-      keyToReady.remove(q.key);
-    } finally {
-      lock.unlock();
-    }
+    q.ready = false;
   }
 
   /**
    * Clear everything
    */
   void clear() {
-    lock.lock();
-    try {
-      keyToReady.clear();
-      deque.clear();
-    } finally {
-      lock.unlock();
-    }
+    waiters.clear();
+    queue.clear();
   }
 }

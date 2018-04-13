@@ -50,6 +50,8 @@ final class SizeBoundedQueue {
   private boolean _benchmark = false;
 
   private volatile long lastAccessNanos = System.nanoTime();
+  // Flag indicates if this queue's size exceeds bufferedMaxMessages and ready to be drained
+  volatile boolean ready = false;
 
   SizeBoundedQueue(int maxSize, Strategy overflowStrategy, MessageKey key) {
     int initialCapacity = DEFAULT_CAPACITY > maxSize ? maxSize : DEFAULT_CAPACITY;
