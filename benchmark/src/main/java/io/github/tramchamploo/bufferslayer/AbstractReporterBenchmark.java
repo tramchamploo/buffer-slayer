@@ -8,21 +8,21 @@ import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 
-@SuppressWarnings("unchecked")
 public abstract class AbstractReporterBenchmark {
 
   static NoopSender<Message> sender = new NoopSender<>();
   static InMemoryReporterMetrics metrics =
       InMemoryReporterMetrics.instance(ReporterMetricsExporter.NOOP_EXPORTER);
 
-  Reporter reporter;
+  Reporter<Message, ?> reporter;
 
   static Message message() {
     return TestMessage.newMessage(0);
   }
 
-  protected abstract Reporter getReporter();
+  protected abstract Reporter<Message, ?> getReporter();
 
   @Setup
   public void setup() {
@@ -65,4 +65,11 @@ public abstract class AbstractReporterBenchmark {
   public void high_contention_report(InMemoryReporterMetricsAsCounters counters) {
     reporter.report(message());
   }
+
+  @TearDown(Level.Iteration)
+  public void clear() {
+    doClear();
+  }
+
+  protected abstract void doClear();
 }

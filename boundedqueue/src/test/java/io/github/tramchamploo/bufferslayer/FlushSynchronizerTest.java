@@ -31,12 +31,8 @@ public class FlushSynchronizerTest {
     CountDownLatch countDown = new CountDownLatch(1);
 
     new Thread(() -> {
-      try {
-        SizeBoundedQueue q = synchronizer.poll(Long.MAX_VALUE);
-        if (q != null) countDown.countDown();
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
+      SizeBoundedQueue q = synchronizer.poll(Long.MAX_VALUE);
+      if (q != null) countDown.countDown();
     }).start();
 
     new Thread(() -> {
@@ -53,16 +49,44 @@ public class FlushSynchronizerTest {
   }
 
   @Test
+  public void pollThreadsShouldBeScheduledInOrder() throws InterruptedException {
+    SizeBoundedQueue q1 = new SizeBoundedQueue(1, Strategy.DropTail);
+    SizeBoundedQueue q2 = new SizeBoundedQueue(1, Strategy.DropTail);
+
+    CountDownLatch countDown = new CountDownLatch(2);
+
+    new Thread(() -> {
+      SizeBoundedQueue q = synchronizer.poll(Long.MAX_VALUE);
+      if (q == q1) countDown.countDown();
+    }).start();
+    Thread.sleep(20);
+    new Thread(() -> {
+      SizeBoundedQueue q = synchronizer.poll(Long.MAX_VALUE);
+      if (q == q2) countDown.countDown();
+    }).start();
+
+    new Thread(() -> {
+      try {
+        Thread.sleep(50);
+        synchronizer.offer(q1);
+        Thread.sleep(50);
+        synchronizer.offer(q2);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+    }).start();
+
+    assertFalse(countDown.await(80, TimeUnit.MILLISECONDS));
+    assertTrue(countDown.await(40, TimeUnit.MILLISECONDS));
+  }
+
+  @Test
   public void returnNullIfExceedsTimeout() throws InterruptedException {
     CountDownLatch countDown = new CountDownLatch(1);
 
     new Thread(() -> {
-      try {
-        assertNull(synchronizer.poll(TimeUnit.MILLISECONDS.toNanos(50)));
-        countDown.countDown();
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
+      assertNull(synchronizer.poll(TimeUnit.MILLISECONDS.toNanos(50)));
+      countDown.countDown();
     }).start();
 
     assertFalse(countDown.await(40, TimeUnit.MILLISECONDS));

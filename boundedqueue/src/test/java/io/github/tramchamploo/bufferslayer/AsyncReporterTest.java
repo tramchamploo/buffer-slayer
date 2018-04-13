@@ -6,7 +6,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import io.github.tramchamploo.bufferslayer.internal.MessageFuture;
 import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -68,8 +67,7 @@ public class AsyncReporterTest {
     assertEquals(50, sender.sent.size());
 
     // make sure the queue is released
-    assertEquals(0, reporter.synchronizer.deque.size());
-    assertEquals(0, reporter.synchronizer.keyToReady.size());
+    assertEquals(0, reporter.synchronizer.queue.size());
   }
 
   @Test

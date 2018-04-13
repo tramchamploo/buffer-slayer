@@ -32,6 +32,11 @@ public class RxReporterBenchmark extends AbstractReporterBenchmark {
         .build();
   }
 
+  @Override
+  protected void doClear() {
+    // Seems no way to clear pending messages on a RxJava's Flowable
+  }
+
   public static void main(String[] args) throws RunnerException {
     Options opt = new OptionsBuilder()
         .include(".*" + RxReporterBenchmark.class.getSimpleName() + ".*")

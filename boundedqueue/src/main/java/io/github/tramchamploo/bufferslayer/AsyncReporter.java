@@ -346,14 +346,19 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
       Thread.currentThread().interrupt();
     }
     flush();
-    clearPendings();
+
+    int dropped = clearPendings();
+    if (dropped > 0) {
+      logger.warn("Dropped " + dropped + " messages due to AsyncReporter.close()");
+    }
+
     if (scheduler != null) {
       clearTimers();
       scheduler.shutdown();
     }
   }
 
-  private void clearPendings() {
+  int clearPendings() {
     int count = 0;
     for (SizeBoundedQueue q : queueManager.elements()) {
       count += q.clear();
@@ -362,7 +367,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     queueManager.clear();
     if (count > 0) {
       metrics.incrementMessagesDropped(count);
-      logger.warn("Dropped " + count + " messages due to AsyncReporter.close()");
     }
+    return count;
   }
 }

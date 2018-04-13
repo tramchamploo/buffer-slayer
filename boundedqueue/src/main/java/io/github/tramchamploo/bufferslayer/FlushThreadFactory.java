@@ -25,27 +25,7 @@ class FlushThreadFactory {
   }
 
   Thread newFlushThread() {
-    return factory.newThread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          while (!reporter.closed.get()) {
-            try {
-              // wait when no queue is ready
-              SizeBoundedQueue q = synchronizer.poll(reporter.messageTimeoutNanos);
-              if (q == null) continue;
-              reScheduleAndFlush(q);
-            } catch (InterruptedException e) {
-              logger.error("Interrupted waiting for a ready queue.");
-            }
-          }
-        } finally {
-          if (reporter.closed.get()) { // wake up notice thread
-            reporter.close.countDown();
-          }
-        }
-      }
-    });
+    return factory.newThread(new FlushRunnable());
   }
 
   private void reScheduleAndFlush(SizeBoundedQueue q) {
@@ -59,6 +39,28 @@ class FlushThreadFactory {
       }
     } finally {
       synchronizer.release(q);
+    }
+  }
+
+  private class FlushRunnable implements Runnable {
+    @Override
+    public void run() {
+      try {
+        while (!reporter.closed.get()) {
+          if (Thread.interrupted()) {
+            logger.error("Interrupted while waiting for a ready queue");
+            break;
+          }
+          // wait when no queue is ready
+          SizeBoundedQueue q = synchronizer.poll(reporter.messageTimeoutNanos);
+          if (q == null) continue;
+          reScheduleAndFlush(q);
+        }
+      } finally {
+        if (reporter.closed.get()) { // wake up cleanup thread
+          reporter.close.countDown();
+        }
+      }
     }
   }
 }
