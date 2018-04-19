@@ -15,9 +15,9 @@ import org.junit.Test;
 @SuppressWarnings("unchecked")
 public class QueueManagerTest {
 
-  QueueManager manager;
+  private QueueManager manager;
 
-  static MessageKey testKey() {
+  private static MessageKey testKey() {
     return new MessageKey() {
       @Override
       public int hashCode() {
@@ -44,7 +44,7 @@ public class QueueManagerTest {
   
   @Test
   public void getAfterCreate() {
-    SizeBoundedQueue q = manager.getOrCreate(testKey());
+    AbstractSizeBoundedQueue q = manager.getOrCreate(testKey());
     assertEquals(q, manager.getOrCreate(testKey()));
   }
 
@@ -54,7 +54,7 @@ public class QueueManagerTest {
     AtomicInteger callCount = new AtomicInteger();
     manager.onCreate(new Callback() {
       @Override
-      public void call(SizeBoundedQueue queue) {
+      public void call(AbstractSizeBoundedQueue queue) {
         assertEquals(testKey(), queue.key);
         callCount.incrementAndGet();
         countDown.countDown();
@@ -69,12 +69,12 @@ public class QueueManagerTest {
 
   @Test
   public void keepAlive() throws InterruptedException {
-    SizeBoundedQueue q = manager.getOrCreate(testKey());
+    AbstractSizeBoundedQueue q = manager.getOrCreate(testKey());
     TimeUnit.MILLISECONDS.sleep(10);
 
     assertEquals(testKey(), manager.shrink().get(0));
     assertEquals(0, manager.keyToQueue.size());
-    SizeBoundedQueue q1 = manager.getOrCreate(testKey());
+    AbstractSizeBoundedQueue q1 = manager.getOrCreate(testKey());
     assertNotEquals(q, q1);
 
     TimeUnit.MILLISECONDS.sleep(10);

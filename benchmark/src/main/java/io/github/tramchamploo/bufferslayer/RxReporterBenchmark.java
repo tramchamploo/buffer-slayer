@@ -26,9 +26,9 @@ public class RxReporterBenchmark extends AbstractReporterBenchmark {
   @Override
   protected Reporter getReporter() {
     return RxReporter.builder(sender)
-        .pendingMaxMessages(100_000)
+        .pendingMaxMessages(100)
         .metrics(metrics)
-        .messageTimeout(1000, TimeUnit.NANOSECONDS)
+        .messageTimeout(10, TimeUnit.MILLISECONDS)
         .build();
   }
 

@@ -11,7 +11,6 @@ import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
 import io.github.tramchamploo.bufferslayer.internal.MessagePromise;
 import io.github.tramchamploo.bufferslayer.internal.Promises;
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -22,54 +21,32 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  * <p>This is similar to {@link java.util.concurrent.ArrayBlockingQueue} in implementation.
  */
-final class SizeBoundedQueue {
-
-  interface Consumer {
-
-    /**
-     * Returns true if it accepted the next element
-     */
-    boolean accept(MessagePromise<?> next);
-  }
-
+final class BlockingSizeBoundedQueue extends AbstractSizeBoundedQueue {
   private static final int DEFAULT_CAPACITY = 10;
 
   private final ReentrantLock lock = new ReentrantLock(false);
   private final Condition notFull = lock.newCondition();
 
   private final Strategy overflowStrategy;
-  final int maxSize;
-  final MessageKey key;
 
   private MessagePromise<?>[] elements;
   private int writePos;
   private int readPos;
-  int count;
+  private int count;
 
-  // Set promise success if true, only used in benchmark
-  private boolean _benchmark = false;
-
-  private volatile long lastAccessNanos = System.nanoTime();
-  // Flag indicates if this queue's size exceeds bufferedMaxMessages and ready to be drained
-  volatile boolean ready = false;
-
-  SizeBoundedQueue(int maxSize, Strategy overflowStrategy, MessageKey key) {
+  BlockingSizeBoundedQueue(int maxSize, Strategy overflowStrategy, MessageKey key) {
+    super(maxSize, key);
     int initialCapacity = DEFAULT_CAPACITY > maxSize ? maxSize : DEFAULT_CAPACITY;
     this.elements = new MessagePromise[initialCapacity];
-    this.maxSize = maxSize;
     this.overflowStrategy = overflowStrategy;
-    this.key = key;
   }
 
   // Used for testing
-  SizeBoundedQueue(int maxSize, Strategy overflowStrategy) {
+  BlockingSizeBoundedQueue(int maxSize, Strategy overflowStrategy) {
     this(maxSize, overflowStrategy, Message.SINGLE_KEY);
   }
 
-  /**
-   * Notify deferred if the element could be added or reject if it could not due to its
-   * {@link OverflowStrategy.Strategy}.
-   */
+  @Override
   void offer(MessagePromise<?> promise) {
     Message message = promise.message();
 
@@ -92,7 +69,7 @@ final class SizeBoundedQueue {
             head.setFailure(dropped(DropHead, head.message()));
             return;
           case DropBuffer:
-            List<MessagePromise<?>> allElements = removeAll();
+            List<MessagePromise<?>> allElements = copyAll();
             doClear();
             enqueue(promise);
             Promises.allFail(allElements, DropBuffer);
@@ -177,31 +154,19 @@ final class SizeBoundedQueue {
       }
 
       count++;
-      if (_benchmark) {
-        next.setSuccess();
-      }
     } catch (InterruptedException e) {
     }
   }
 
-  /**
-   * Set the benchmark mode
-   */
-  void _setBenchmarkMode(boolean benchmark) {
-    _benchmark = benchmark;
+  private List<MessagePromise<?>> copyAll() {
+    MessagePromise<?>[] copy = new MessagePromise[count];
+    int length = elements.length - readPos;
+    System.arraycopy(elements, readPos, copy, 0, length);
+    System.arraycopy(elements, 0, copy, length, writePos);
+    return Arrays.asList(copy);
   }
 
-  private List<MessagePromise<?>> removeAll() {
-    final List<MessagePromise<?>> result = new LinkedList<>();
-    doDrain(new Consumer() {
-      @Override
-      public boolean accept(MessagePromise<?> next) {
-        return result.add(next);
-      }
-    });
-    return result;
-  }
-
+  @Override
   int drainTo(Consumer consumer) {
     lock.lock();
     try {
@@ -227,6 +192,10 @@ final class SizeBoundedQueue {
         if (++readPos == elements.length) {
           readPos = 0; // circle back to the front of the array
         }
+
+        if (_benchmark) {
+          next.setSuccess();
+        }
       } else {
         break;
       }
@@ -239,9 +208,7 @@ final class SizeBoundedQueue {
     return drainedCount;
   }
 
-  /**
-   * Clears the queue unconditionally and returns count of elements cleared.
-   */
+  @Override
   int clear() {
     lock.lock();
     try {
@@ -262,6 +229,7 @@ final class SizeBoundedQueue {
     return result;
   }
 
+  @Override
   int size() {
     lock.lock();
     try {
@@ -271,19 +239,13 @@ final class SizeBoundedQueue {
     }
   }
 
-  /**
-   * set last access time to now
-   */
-  void recordAccess() {
-    if (key != Message.SINGLE_KEY) {
-      lastAccessNanos = System.nanoTime();
+  @Override
+  boolean isEmpty() {
+    lock.lock();
+    try {
+      return count == 0;
+    } finally {
+      lock.unlock();
     }
-  }
-
-  /**
-   * last time of this key accessed in nanoseconds
-   */
-  long lastAccessNanos() {
-    return key == Message.SINGLE_KEY ? Long.MAX_VALUE : lastAccessNanos;
   }
 }

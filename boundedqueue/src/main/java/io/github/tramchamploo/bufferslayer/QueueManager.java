@@ -13,17 +13,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Manages {@link SizeBoundedQueue}'s lifecycle
+ * Manages {@link AbstractSizeBoundedQueue}'s lifecycle
  */
 class QueueManager {
 
   private final Logger logger = LoggerFactory.getLogger(getClass());
 
-  final ConcurrentMap<MessageKey, SizeBoundedQueue> keyToQueue;
+  final ConcurrentMap<MessageKey, AbstractSizeBoundedQueue> keyToQueue;
 
-  final int pendingMaxMessages;
-  final Strategy overflowStrategy;
-  final long pendingKeepaliveNanos;
+  private final int pendingMaxMessages;
+  private final Strategy overflowStrategy;
+  private final long pendingKeepaliveNanos;
+  private final SizeBoundedQueueFactory queueFactory = SizeBoundedQueueFactory.factory();
 
   private Callback createCallback;
 
@@ -38,7 +39,7 @@ class QueueManager {
   }
 
   interface Callback {
-    void call(SizeBoundedQueue queue);
+    void call(AbstractSizeBoundedQueue queue);
   }
 
   private static long now() {
@@ -51,7 +52,7 @@ class QueueManager {
    * @param key message key related to the queue
    * @return the queue if existed otherwise null
    */
-  SizeBoundedQueue get(MessageKey key) {
+  AbstractSizeBoundedQueue get(MessageKey key) {
     return keyToQueue.get(key);
   }
 
@@ -61,11 +62,11 @@ class QueueManager {
    * @param key message key related to the queue
    * @return the queue
    */
-  SizeBoundedQueue getOrCreate(MessageKey key) {
-    SizeBoundedQueue queue = keyToQueue.get(key);
+  AbstractSizeBoundedQueue getOrCreate(MessageKey key) {
+    AbstractSizeBoundedQueue queue = keyToQueue.get(key);
     if (queue == null) {
-      queue = new SizeBoundedQueue(pendingMaxMessages, overflowStrategy, key);
-      SizeBoundedQueue prev = keyToQueue.putIfAbsent(key, queue);
+      queue = queueFactory.newQueue(pendingMaxMessages, overflowStrategy, key);
+      AbstractSizeBoundedQueue prev = keyToQueue.putIfAbsent(key, queue);
       if (prev == null) {
         onCreate(queue);
         if (logger.isDebugEnabled()) {
@@ -79,7 +80,7 @@ class QueueManager {
     return queue;
   }
 
-  private void onCreate(SizeBoundedQueue queue) {
+  private void onCreate(AbstractSizeBoundedQueue queue) {
     if (createCallback != null) createCallback.call(queue);
   }
 
@@ -97,14 +98,14 @@ class QueueManager {
   LinkedList<MessageKey> shrink() {
     LinkedList<MessageKey> result = new LinkedList<>();
 
-      Iterator<Entry<MessageKey, SizeBoundedQueue>> iter;
+      Iterator<Entry<MessageKey, AbstractSizeBoundedQueue>> iter;
       for (iter = keyToQueue.entrySet().iterator(); iter.hasNext(); ) {
-        Entry<MessageKey, SizeBoundedQueue> entry = iter.next();
+        Entry<MessageKey, AbstractSizeBoundedQueue> entry = iter.next();
         MessageKey key = entry.getKey();
-        SizeBoundedQueue q = entry.getValue();
+        AbstractSizeBoundedQueue q = entry.getValue();
 
         if (now() - q.lastAccessNanos() > pendingKeepaliveNanos) {
-          if (q.count > 0) continue;
+          if (!q.isEmpty()) continue;
           iter.remove();
           result.add(key);
         }
@@ -125,7 +126,7 @@ class QueueManager {
   /**
    * Get all queues
    */
-  Collection<SizeBoundedQueue> elements() {
+  Collection<AbstractSizeBoundedQueue> elements() {
     return new ArrayList<>(keyToQueue.values());
   }
 }

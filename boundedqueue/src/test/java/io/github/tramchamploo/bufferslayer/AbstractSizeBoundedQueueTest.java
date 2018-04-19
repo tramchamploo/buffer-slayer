@@ -17,13 +17,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-public class SizeBoundedQueueTest {
+public abstract class AbstractSizeBoundedQueueTest {
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
   OverflowStrategy.Strategy dropNew = OverflowStrategy.dropNew;
-  SizeBoundedQueue queue = new SizeBoundedQueue(16, dropNew);
+  AbstractSizeBoundedQueue queue = newQueue(dropNew);
+
+  protected abstract AbstractSizeBoundedQueue newQueue(OverflowStrategy.Strategy strategy);
 
   @Test
   public void offer_failsWhenFull_size() {
@@ -44,12 +46,12 @@ public class SizeBoundedQueueTest {
     for (int i = 0; i < queue.maxSize; i++) {
       queue.offer(newPromise(i));
     }
-    assertEquals(queue.maxSize, queue.count);
+    assertEquals(queue.maxSize, queue.size());
   }
 
   @Test
   public void expectExceptionWhenFullSize_failStrategy() {
-    SizeBoundedQueue queue = new SizeBoundedQueue(16, OverflowStrategy.fail);
+    AbstractSizeBoundedQueue queue = newQueue(OverflowStrategy.fail);
     for (int i = 0; i < queue.maxSize; i++) {
       queue.offer(newPromise(i));
     }
@@ -62,7 +64,7 @@ public class SizeBoundedQueueTest {
 
   @Test
   public void dropHeadWhenFull_dropHeadStrategy() throws InterruptedException {
-    SizeBoundedQueue queue = new SizeBoundedQueue(16, OverflowStrategy.dropHead);
+    AbstractSizeBoundedQueue queue = newQueue(OverflowStrategy.dropHead);
     CountDownLatch countDown = new CountDownLatch(1);
 
     for (int i = 0; i < queue.maxSize; i++) {
@@ -85,7 +87,7 @@ public class SizeBoundedQueueTest {
 
   @Test
   public void dropTailWhenFull_dropTailStrategy() throws InterruptedException {
-    SizeBoundedQueue queue = new SizeBoundedQueue(16, OverflowStrategy.dropTail);
+    AbstractSizeBoundedQueue queue = newQueue(OverflowStrategy.dropTail);
     CountDownLatch countDown = new CountDownLatch(1);
 
     for (int i = 0; i < queue.maxSize; i++) {
@@ -108,7 +110,7 @@ public class SizeBoundedQueueTest {
 
   @Test
   public void dropBufferWhenFull_dropBufferStrategy() throws InterruptedException {
-    SizeBoundedQueue queue = new SizeBoundedQueue(16, OverflowStrategy.dropBuffer);
+    AbstractSizeBoundedQueue queue = newQueue(OverflowStrategy.dropBuffer);
     CountDownLatch countDown = new CountDownLatch(1);
 
     for (int i = 0; i < queue.maxSize; i++) {
@@ -135,7 +137,7 @@ public class SizeBoundedQueueTest {
 
   @Test
   public void blockCallerWhenFull_blockStrategy() throws InterruptedException {
-    SizeBoundedQueue queue = new SizeBoundedQueue(16, OverflowStrategy.block);
+    AbstractSizeBoundedQueue queue = newQueue(OverflowStrategy.block);
     for (int i = 0; i < queue.maxSize; i++) {
       MessagePromise<Integer> next = newPromise(i);
       queue.offer(next);
@@ -154,12 +156,12 @@ public class SizeBoundedQueueTest {
 
   @Test
   public void circular() {
-    SizeBoundedQueue queue = new SizeBoundedQueue(16, dropNew);
+    AbstractSizeBoundedQueue queue = newQueue(dropNew);
 
     List<MessagePromise> polled = new ArrayList<>();
-    SizeBoundedQueue.Consumer consumer = polled::add;
+    BlockingSizeBoundedQueue.Consumer consumer = polled::add;
 
-    // Offer more than the capacity, flushing via poll on interval
+    // Offer more than capacity, flushing via poll on interval
     for (byte i = 0; i < 20; i++) {
       MessagePromise<Integer> next = newPromise(i);
       queue.offer(next);
@@ -179,9 +181,9 @@ public class SizeBoundedQueueTest {
     return ((TestMessage) (((MessageDroppedException) future.cause()).dropped.get(0))).key;
   }
 
-  private Object[] collectKeys(SizeBoundedQueue queue) {
+  private Object[] collectKeys(AbstractSizeBoundedQueue queue) {
     List<MessagePromise> polled = new ArrayList<>();
-    SizeBoundedQueue.Consumer consumer = polled::add;
+    AbstractSizeBoundedQueue.Consumer consumer = polled::add;
     queue.drainTo(consumer);
     return polled.stream()
         .map(m -> ((TestMessage) m.message()).key)

@@ -81,7 +81,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     if (messageTimeoutNanos > 0) {
       this.queueManager.onCreate(new Callback() {
         @Override
-        public void call(SizeBoundedQueue queue) {
+        public void call(AbstractSizeBoundedQueue queue) {
           schedulePeriodically(queue.key, messageTimeoutNanos);
         }
       });
@@ -182,7 +182,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
 
   @Override
   protected void onTimer(MessageKey timerKey) {
-    SizeBoundedQueue q = queueManager.get(timerKey);
+    AbstractSizeBoundedQueue q = queueManager.get(timerKey);
     if (q != null && q.size() > 0) flush(q);
   }
 
@@ -232,7 +232,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
         Message.SINGLE_KEY : message.asMessageKey();
 
     // Offer message to pending queue.
-    SizeBoundedQueue pending = queueManager.getOrCreate(key);
+    AbstractSizeBoundedQueue pending = queueManager.getOrCreate(key);
     MessagePromise<R> promise = message.newPromise();
     pending.offer(promise);
     setFailListener(promise);
@@ -269,13 +269,13 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
 
   @Override
   public void flush() {
-    for (SizeBoundedQueue pending : queueManager.elements()) {
+    for (AbstractSizeBoundedQueue pending : queueManager.elements()) {
       Future<?> future = flush(pending);
       future.awaitUninterruptibly();
     }
   }
 
-  Future<?> flush(SizeBoundedQueue pending) {
+  Future<?> flush(AbstractSizeBoundedQueue pending) {
     // Remove overtime queues and relative metrics and timer
     List<MessageKey> shrinked = queueManager.shrink();
     clearMetricsAndTimer(shrinked);
@@ -294,7 +294,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
       bufferPool.release(buffer);
     }
     // Update metrics
-    metrics.updateQueuedMessages(pending.key, pending.count);
+    metrics.updateQueuedMessages(pending.key, pending.size());
     // Signal producers
     if (!memoryLimiter.isMaximum()) {
       memoryLimiter.signalAll();
@@ -360,7 +360,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
 
   int clearPendings() {
     int count = 0;
-    for (SizeBoundedQueue q : queueManager.elements()) {
+    for (AbstractSizeBoundedQueue q : queueManager.elements()) {
       count += q.clear();
       metrics.removeQueuedMessages(q.key);
     }
