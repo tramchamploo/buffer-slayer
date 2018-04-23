@@ -1,5 +1,7 @@
 package io.github.tramchamploo.bufferslayer;
 
+import io.github.tramchamploo.bufferslayer.Message.MessageKey;
+import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -20,26 +22,16 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @State(Scope.Group)
-public class AsyncReporterBenchmark extends AbstractReporterBenchmark {
+public class ConcurrentSizeBoundedQueueBenchmark extends AbstractSizeBoundedQueueBenchmark {
 
   @Override
-  protected Reporter<Message, ?> getReporter() {
-    return AsyncReporter.builder(sender)
-        .pendingMaxMessages(100)
-        .totalQueuedMessages(100)
-        .metrics(metrics)
-        .messageTimeout(10, TimeUnit.MILLISECONDS)
-        .build();
-  }
-
-  @Override
-  protected void doClear() {
-    ((AsyncReporter) reporter).clearPendings();
+  protected AbstractSizeBoundedQueue newQueue(int maxSize, Strategy strategy, MessageKey key) {
+    return new ConcurrentSizeBoundedQueue(maxSize, strategy, key);
   }
 
   public static void main(String[] args) throws RunnerException {
     Options opt = new OptionsBuilder()
-        .include(".*" + AsyncReporterBenchmark.class.getSimpleName() + ".*")
+        .include(".*" + ConcurrentSizeBoundedQueueBenchmark.class.getSimpleName() + ".*")
         .build();
 
     new Runner(opt).run();

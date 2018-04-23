@@ -10,7 +10,7 @@ import java.util.List;
 /**
  * A buffer that gathers messages which will be sent in the same batch later
  */
-final class Buffer implements SizeBoundedQueue.Consumer {
+final class Buffer implements AbstractSizeBoundedQueue.Consumer {
 
   private final int maxSize;
   private final boolean onlyAcceptSame;

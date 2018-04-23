@@ -1,36 +1,19 @@
 package io.github.tramchamploo.bufferslayer;
 
+import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.internal.MessageFuture;
 import io.github.tramchamploo.bufferslayer.internal.MessagePromise;
-import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.BenchmarkMode;
-import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Group;
 import org.openjdk.jmh.annotations.GroupThreads;
 import org.openjdk.jmh.annotations.Level;
-import org.openjdk.jmh.annotations.Measurement;
-import org.openjdk.jmh.annotations.Mode;
-import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
-import org.openjdk.jmh.annotations.Warmup;
-import org.openjdk.jmh.runner.Runner;
-import org.openjdk.jmh.runner.RunnerException;
-import org.openjdk.jmh.runner.options.Options;
-import org.openjdk.jmh.runner.options.OptionsBuilder;
 
-@Measurement(iterations = 5, time = 1)
-@Warmup(iterations = 10, time = 1)
-@Fork(3)
-@BenchmarkMode(Mode.Throughput)
-@OutputTimeUnit(TimeUnit.SECONDS)
-@State(Scope.Group)
-@SuppressWarnings("unchecked")
-public class SizeBoundedQueueBenchmark {
+public abstract class AbstractSizeBoundedQueueBenchmark {
 
   @State(Scope.Thread)
   public static class Factory {
@@ -84,13 +67,16 @@ public class SizeBoundedQueueBenchmark {
     }
   }
 
-  SizeBoundedQueue q;
+  private AbstractSizeBoundedQueue q;
 
   @Setup
   public void setup() {
-    q = new SizeBoundedQueue(10000, OverflowStrategy.block, Message.SINGLE_KEY);
+    q = newQueue(10000, OverflowStrategy.fail, Message.SINGLE_KEY);
     q._setBenchmarkMode(true);
   }
+
+  protected abstract AbstractSizeBoundedQueue newQueue(
+      int maxSize, OverflowStrategy.Strategy strategy, MessageKey key);
 
   @TearDown(Level.Iteration)
   public void emptyQ() {
@@ -139,13 +125,5 @@ public class SizeBoundedQueueBenchmark {
       counters.drained++;
       return true;
     });
-  }
-
-  public static void main(String[] args) throws RunnerException {
-    Options opt = new OptionsBuilder()
-        .include(".*" + SizeBoundedQueueBenchmark.class.getSimpleName() + ".*")
-        .build();
-
-    new Runner(opt).run();
   }
 }

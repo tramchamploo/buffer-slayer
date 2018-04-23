@@ -2,7 +2,8 @@ package io.github.tramchamploo.bufferslayer;
 
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * <p>Flush threads should be notified when pending queue has more elements
@@ -10,25 +11,32 @@ import java.util.concurrent.locks.LockSupport;
  */
 class FlushSynchronizer {
 
-  final Queue<SizeBoundedQueue> queue = new ConcurrentLinkedQueue<>();
-  // Threads that waiting to poll
-  private final Queue<Thread> waiters = new ConcurrentLinkedQueue<>();
+  final Queue<AbstractSizeBoundedQueue> queue = new ConcurrentLinkedQueue<>();
+  // Threads that waiting to poll block for a certain period of time
+  private final ReentrantLock blocker = new ReentrantLock();
+  private final Condition notEmpty = blocker.newCondition();
 
   /**
    * Offer a queue here in order to make flush threads have something to drain
    * <p> if queue already existed, do nothing
    * @param q queue to offer
    */
-  boolean offer(SizeBoundedQueue q) {
+  boolean offer(AbstractSizeBoundedQueue q) {
     if (q.ready) {
       return false;
     }
 
     q.ready = true;
     boolean result = queue.offer(q);
-    Thread top = waiters.poll();
-    if (top != null) {
-      LockSupport.unpark(top);
+    // Not blockingly acquire lock here to ensure fast offering
+    if (blocker.tryLock()) {
+      try {
+        if (blocker.hasWaiters(notEmpty)) {
+          notEmpty.signalAll();
+        }
+      } finally {
+        blocker.unlock();
+      }
     }
     return result;
   }
@@ -38,41 +46,38 @@ class FlushSynchronizer {
    * @param timeoutNanos if reaches this timeout and no queue appears, return null
    * @return the first queue offered
    */
-  SizeBoundedQueue poll(long timeoutNanos) {
-    final long deadline = System.nanoTime() + timeoutNanos;
-
+  AbstractSizeBoundedQueue poll(long timeoutNanos) {
     boolean wasInterrupted = false;
-    boolean queued = false;
-    Thread current = Thread.currentThread();
+    AbstractSizeBoundedQueue first;
 
-    while (queue.isEmpty()) {
-      timeoutNanos = deadline - System.nanoTime();
-      if (timeoutNanos <= 0L) {
-        return null;
-      }
+    blocker.lock();
+    try {
+      while ((first = queue.poll()) == null) {
+        if (timeoutNanos <= 0L)
+          return null;
 
-      if (!queued) {
-        waiters.offer(current);
-        queued = true;
+        try {
+          timeoutNanos = notEmpty.awaitNanos(timeoutNanos);
+        } catch (InterruptedException e) {
+          wasInterrupted = true;
+        }
       }
-
-      LockSupport.parkNanos(this, timeoutNanos);
-      if (Thread.interrupted()) {
-        wasInterrupted = true;
-      }
+    } finally {
+      blocker.unlock();
     }
 
+    // recover interrupt status
     if (wasInterrupted) {
-      current.interrupt();
+      Thread.currentThread().interrupt();
     }
 
-    return queue.poll();
+    return first;
   }
 
   /**
    * Remove the key from the map so it can be offered again
    */
-  void release(SizeBoundedQueue q) {
+  void release(AbstractSizeBoundedQueue q) {
     q.ready = false;
   }
 
@@ -80,7 +85,6 @@ class FlushSynchronizer {
    * Clear everything
    */
   void clear() {
-    waiters.clear();
     queue.clear();
   }
 }

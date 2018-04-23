@@ -28,7 +28,7 @@ class FlushThreadFactory {
     return factory.newThread(new FlushRunnable());
   }
 
-  private void reScheduleAndFlush(SizeBoundedQueue q) {
+  private void reScheduleAndFlush(AbstractSizeBoundedQueue q) {
     try {
       while (q.size() >= reporter.bufferedMaxMessages) {
         // cancel timer on the queue and reschedule
@@ -52,7 +52,7 @@ class FlushThreadFactory {
             break;
           }
           // wait when no queue is ready
-          SizeBoundedQueue q = synchronizer.poll(reporter.messageTimeoutNanos);
+          AbstractSizeBoundedQueue q = synchronizer.poll(reporter.messageTimeoutNanos);
           if (q == null) continue;
           reScheduleAndFlush(q);
         }
