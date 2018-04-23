@@ -39,6 +39,9 @@ EOF
 
   if [ $? -eq 0 ]; then
     mvn -B release:perform --settings=".buildscript/settings.xml" -Prelease -Darguments="-DskipTests"
+    if [ $? -ne 0 ]; then
+      exit 2
+    fi
   else
     echo "Error preparing a release, rolling back..."
     mvn -B release:rollback
