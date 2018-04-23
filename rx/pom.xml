@@ -3,7 +3,7 @@
   <parent>
     <artifactId>bufferslayer-parent</artifactId>
     <groupId>io.github.tramchamploo</groupId>
-    <version>1.5.3-SNAPSHOT</version>
+    <version>1.5.0.RELEASE</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
