@@ -3,33 +3,45 @@ version: 2
 jobs:
   build:
     working_directory: ~/buffer-slayer
-
     docker:
       - image: circleci/openjdk:8-jdk-browsers
 
     steps:
       - checkout
-
       - run: openssl aes-256-cbc -d -in .buildscript/secret-env-cipher -k $KEY >> $BASH_ENV
-
       - restore_cache:
           key: dependency-cache
-
       - run: mvn install dependency:go-offline -DskipTests
-
       - save_cache:
           paths:
             - ~/.m2
           key: dependency-cache
-
       - run: mvn clean test
-
       - run: mkdir surefire-reports
-
       - run: find . -type f -regex ".*/target/surefire-reports/.*xml" -exec cp {} surefire-reports/ \;
-
       - store_test_results:
           path: surefire-reports
 
+  deploy:
+    working_directory: ~/buffer-slayer
+    docker:
+      - image: circleci/openjdk:8-jdk-browsers
+
+    steps:
+      - checkout
+      - run: openssl aes-256-cbc -d -in .buildscript/secret-env-cipher -k $KEY >> $BASH_ENV
+      - restore_cache:
+          key: dependency-cache
+      - run: .buildscript/release.sh
+
+workflows:
+  version: 2
+  build-deploy:
+    jobs:
+      - build
       - deploy:
-          command: .buildscript/release.sh
+          requires:
+            - build
+          filters:
+            branches:
+              only: master
