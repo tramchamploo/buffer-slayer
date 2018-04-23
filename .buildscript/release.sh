@@ -47,6 +47,6 @@ EOF
   # Modify version in README.md
   sed -i "s/<version>\(.*\)</<version>$RELEASE</" README.md
   git add README.md
-  git commit -m "Update README at $(date)"
+  TZ=Asia/Shanghai git commit -m "Update README at $(date)"
   git push origin master
 fi
