@@ -31,4 +31,5 @@ jobs:
       - store_test_results:
           path: surefire-reports
 
-      - run: .buildscript/release.sh
+      - deploy:
+          command: .buildscript/release.sh
