@@ -336,6 +336,6 @@ public class AsyncReporterTest {
     long start = System.currentTimeMillis();
     reporter2.report(newMessage(2));
     long used = System.currentTimeMillis() - start;
-    assertTrue(used > 200);
+    assertTrue(used >= 200);
   }
 }
