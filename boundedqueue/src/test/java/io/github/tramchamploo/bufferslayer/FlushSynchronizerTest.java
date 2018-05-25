@@ -12,7 +12,7 @@ import org.junit.Test;
 
 public class FlushSynchronizerTest {
 
-  FlushSynchronizer synchronizer = new FlushSynchronizer();
+  private FlushSynchronizer synchronizer = new FlushSynchronizer();
 
   @After
   public void cleanup() {

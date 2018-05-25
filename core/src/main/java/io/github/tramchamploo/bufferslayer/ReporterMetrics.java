@@ -29,7 +29,7 @@ public abstract class ReporterMetrics {
 
   public abstract void updateQueuedMessages(MessageKey key, int quantity);
 
-  public abstract void removeQueuedMessages(MessageKey key);
+  public abstract void removeFromQueuedMessages(MessageKey key);
 
   public static final ReporterMetrics NOOP_METRICS = new ReporterMetrics() {
     @Override
@@ -60,7 +60,7 @@ public abstract class ReporterMetrics {
     }
 
     @Override
-    public void removeQueuedMessages(MessageKey key) {
+    public void removeFromQueuedMessages(MessageKey key) {
     }
   };
 }

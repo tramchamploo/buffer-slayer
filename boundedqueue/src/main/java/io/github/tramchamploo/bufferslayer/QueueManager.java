@@ -4,11 +4,9 @@ import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,22 +22,26 @@ class QueueManager {
   private final int pendingMaxMessages;
   private final Strategy overflowStrategy;
   private final long pendingKeepaliveNanos;
+
+  private final TimeDriven<MessageKey> timeDriven;
+  private final ReporterMetrics metrics;
+  private final HashedWheelTimer timer;
+
   private final SizeBoundedQueueFactory queueFactory = SizeBoundedQueueFactory.factory();
+  private CreateCallback createCallback;
 
-  private Callback createCallback;
-
-  QueueManager(int pendingMaxMessages,
-               Strategy overflowStrategy,
-               long pendingKeepaliveNanos) {
+  QueueManager(int pendingMaxMessages, Strategy overflowStrategy,
+      long pendingKeepaliveNanos, TimeDriven<MessageKey> timeDriven,
+      ReporterMetrics metrics, HashedWheelTimer timer) {
     this.keyToQueue = new ConcurrentHashMap<>();
 
     this.pendingMaxMessages = pendingMaxMessages;
     this.overflowStrategy = overflowStrategy;
     this.pendingKeepaliveNanos = pendingKeepaliveNanos;
-  }
 
-  interface Callback {
-    void call(AbstractSizeBoundedQueue queue);
+    this.timeDriven = timeDriven;
+    this.metrics = metrics;
+    this.timer = timer;
   }
 
   private static long now() {
@@ -67,16 +69,23 @@ class QueueManager {
     if (queue == null) {
       queue = queueFactory.newQueue(pendingMaxMessages, overflowStrategy, key);
       AbstractSizeBoundedQueue prev = keyToQueue.putIfAbsent(key, queue);
+
       if (prev == null) {
+        // schedule a clean task
+        timer.newTimeout(new CleanTask(queue),
+            pendingKeepaliveNanos, TimeUnit.NANOSECONDS);
+        // call listener
         onCreate(queue);
         if (logger.isDebugEnabled()) {
           logger.debug("Queue created, key: {}", key);
         }
       } else {
         queue = prev;
+        // race failed doesn't record access because too near
       }
+    } else {
+      queue.recordAccess();
     }
-    queue.recordAccess();
     return queue;
   }
 
@@ -88,32 +97,8 @@ class QueueManager {
    * set a callback for queue creation
    * @param callback callback to trigger after a queue is created
    */
-  void onCreate(Callback callback) {
+  void onCreate(CreateCallback callback) {
     createCallback = callback;
-  }
-
-  /**
-   * Drop queues which exceed its keepalive
-   */
-  LinkedList<MessageKey> shrink() {
-    LinkedList<MessageKey> result = new LinkedList<>();
-
-      Iterator<Entry<MessageKey, AbstractSizeBoundedQueue>> iter;
-      for (iter = keyToQueue.entrySet().iterator(); iter.hasNext(); ) {
-        Entry<MessageKey, AbstractSizeBoundedQueue> entry = iter.next();
-        MessageKey key = entry.getKey();
-        AbstractSizeBoundedQueue q = entry.getValue();
-
-        if (now() - q.lastAccessNanos() > pendingKeepaliveNanos) {
-          if (!q.isEmpty()) continue;
-          iter.remove();
-          result.add(key);
-        }
-      }
-    if (logger.isDebugEnabled() && !result.isEmpty()) {
-      logger.debug("Timeout queues removed, keys: {}", result);
-    }
-    return result;
   }
 
   /**
@@ -128,5 +113,46 @@ class QueueManager {
    */
   Collection<AbstractSizeBoundedQueue> elements() {
     return new ArrayList<>(keyToQueue.values());
+  }
+
+  interface CreateCallback {
+    void call(AbstractSizeBoundedQueue queue);
+  }
+
+  /**
+   * Remove queue if exceed timeout else reschedule
+   */
+  private final class CleanTask implements TimerTask {
+    private final AbstractSizeBoundedQueue queue;
+
+    CleanTask(AbstractSizeBoundedQueue queue) {
+      this.queue = queue;
+    }
+
+    @Override
+    public void run(Timeout timeout) {
+      long now = now();
+      long deadline;
+      if (queue.isEmpty() &&
+          (deadline = queue.lastAccessNanos() + pendingKeepaliveNanos) < now &&
+          // Workaround for long overflow
+          deadline > 0) {
+        // Timeout, do clean job
+        MessageKey key = queue.key;
+
+        metrics.removeFromQueuedMessages(key);
+        if (timeDriven.isTimerActive(key)) {
+          timeDriven.cancelTimer(key);
+        }
+        keyToQueue.remove(key);
+
+        if (logger.isDebugEnabled()) {
+          logger.debug("Timeout queue removed, key: {}", key);
+        }
+      } else {
+        long delay = Math.max(0L, pendingKeepaliveNanos - (now - queue.lastAccessNanos()));
+        timeout.timer().newTimeout(this, delay, TimeUnit.NANOSECONDS);
+      }
+    }
   }
 }

@@ -6,7 +6,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.util.Iterator;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -21,7 +23,8 @@ public class AsyncReporterTest {
       InMemoryReporterMetrics.instance(ReporterMetricsExporter.NOOP_EXPORTER);
 
   @After
-  public void close() {
+  public void close() throws IOException {
+    reporter.close();
     metrics.clear();
   }
 
@@ -48,7 +51,8 @@ public class AsyncReporterTest {
     FakeSender sender = new FakeSender();
 
     CountDownLatch countDown = new CountDownLatch(5 * 10);
-    sender.onMessages(m -> IntStream.range(0, m.size()).forEach(i -> countDown.countDown()));
+    sender.onMessages(m ->
+        IntStream.range(0, m.size()).forEach(i -> countDown.countDown()));
 
     reporter = AsyncReporter.builder(sender)
         .pendingMaxMessages(10)
@@ -63,11 +67,23 @@ public class AsyncReporterTest {
       }
     }
 
-    assertTrue(countDown.await(300, TimeUnit.MILLISECONDS));
+    assertTrue(countDown.await(200, TimeUnit.MILLISECONDS));
     assertEquals(50, sender.sent.size());
 
     // make sure the queue is released
     assertEquals(0, reporter.synchronizer.queue.size());
+
+    workoutForInfiniteWaiting(reporter.flushers);
+  }
+
+  private static void workoutForInfiniteWaiting(Set<Thread> flushers) {
+    new Thread(() -> {
+      try {
+        Thread.sleep(50);
+        flushers.forEach(Thread::interrupt);
+      } catch (InterruptedException e) {
+      }
+    }).start();
   }
 
   @Test
@@ -170,7 +186,7 @@ public class AsyncReporterTest {
   }
 
  @Test
-  public void waitWhenClose() throws InterruptedException {
+  public void waitWhenClose() throws InterruptedException, IOException {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
@@ -184,8 +200,14 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void autoFlushWhenClose() throws InterruptedException {
+  public void autoFlushWhenClose() throws InterruptedException, IOException {
+    CountDownLatch countDown = new CountDownLatch(1);
+
     FakeSender sender = new FakeSender();
+    sender.onMessages(messages -> {
+      assertEquals(1, messages.size());
+      countDown.countDown();
+    });
 
     reporter = AsyncReporter.builder(sender)
         .metrics(metrics)
@@ -194,8 +216,8 @@ public class AsyncReporterTest {
 
     reporter.report(newMessage(0));
     reporter.close();
-    Thread.sleep(50);
-    assertEquals(1, sender.sent.size());
+
+    assertTrue(countDown.await(500, TimeUnit.MILLISECONDS));
   }
 
  @Test
@@ -215,7 +237,7 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void dropWhenReporterClosed() {
+  public void dropWhenReporterClosed() throws IOException {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
@@ -250,7 +272,7 @@ public class AsyncReporterTest {
   }
 
   @Test
-  public void closeShouldRemoveMetrics() {
+  public void closeShouldRemoveMetrics() throws IOException {
     FakeSender sender = new FakeSender();
 
     reporter = AsyncReporter.builder(sender)
@@ -263,25 +285,6 @@ public class AsyncReporterTest {
 
     assertEquals(1, metrics.queuedMessages.size());
     reporter.close();
-    assertEquals(0, metrics.queuedMessages.size());
-  }
-
-  @Test
-  public void flushShouldClearOvertimeMetrics() throws InterruptedException {
-    FakeSender sender = new FakeSender();
-
-    reporter = AsyncReporter.builder(sender)
-        .metrics(metrics)
-        .messageTimeout(0, TimeUnit.MILLISECONDS)
-        .pendingKeepalive(50, TimeUnit.MILLISECONDS)
-        .build();
-
-    reporter.report(newMessage(0));
-    reporter.flush();
-    assertEquals(1, metrics.queuedMessages.size());
-
-    Thread.sleep(50);
-    reporter.flush();
     assertEquals(0, metrics.queuedMessages.size());
   }
 

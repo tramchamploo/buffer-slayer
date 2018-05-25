@@ -4,7 +4,6 @@ import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.internal.MessagePromise;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -15,10 +14,9 @@ final class Buffer implements AbstractSizeBoundedQueue.Consumer {
   private final int maxSize;
   private final boolean onlyAcceptSame;
 
-  final List<Object> buffer = new LinkedList<>();
-  boolean bufferFull;
-  Message.MessageKey lastMessageKey;
-  boolean ofTheSameKey = true;
+  final List<Object> buffer = new ArrayList<>();
+  private boolean bufferFull;
+  private Message.MessageKey lastMessageKey;
   Buffer next;
 
   Buffer(int maxSize, boolean onlyAcceptSame) {
@@ -36,7 +34,6 @@ final class Buffer implements AbstractSizeBoundedQueue.Consumer {
       if (lastMessageKey == null) {
         lastMessageKey = nextKey;
       } else if (!lastMessageKey.equals(nextKey)) {
-        ofTheSameKey = false;
         return false;
       }
     }
@@ -59,6 +56,5 @@ final class Buffer implements AbstractSizeBoundedQueue.Consumer {
     buffer.clear();
     bufferFull = false;
     lastMessageKey = null;
-    ofTheSameKey = true;
   }
 }

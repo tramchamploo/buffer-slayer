@@ -8,7 +8,7 @@ import static java.util.Collections.singletonList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
-import io.github.tramchamploo.bufferslayer.QueueManager.Callback;
+import io.github.tramchamploo.bufferslayer.QueueManager.CreateCallback;
 import io.github.tramchamploo.bufferslayer.internal.CompositeFuture;
 import io.github.tramchamploo.bufferslayer.internal.Future;
 import io.github.tramchamploo.bufferslayer.internal.FutureListener;
@@ -16,7 +16,7 @@ import io.github.tramchamploo.bufferslayer.internal.MessageFuture;
 import io.github.tramchamploo.bufferslayer.internal.MessagePromise;
 import io.github.tramchamploo.bufferslayer.internal.SucceededFuture;
 import java.io.Flushable;
-import java.util.Collection;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -36,8 +36,6 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   static final Logger logger = LoggerFactory.getLogger(AsyncReporter.class);
 
   private static final int MAX_BUFFER_POOL_ENTRIES = 1000;
-  static final int DEFAULT_TIMER_THREADS = 1;
-  static final int DEFAULT_FLUSH_THREADS = 1;
 
   static AtomicLong idGenerator = new AtomicLong();
   final Long id = idGenerator.getAndIncrement();
@@ -53,6 +51,9 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   private final FlushThreadFactory flushThreadFactory;
   Set<Thread> flushers;
 
+  private static HashedWheelTimer hashedWheelTimer;
+  private static ThreadFactory hashedWheelTimerThreadFactory;
+
   final FlushSynchronizer synchronizer = new FlushSynchronizer();
   final QueueManager queueManager;
 
@@ -64,6 +65,13 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   private BufferPool bufferPool;
   private final MemoryLimiter memoryLimiter;
 
+  static {
+    ThreadFactoryBuilder builder = new ThreadFactoryBuilder()
+        .setNameFormat(AsyncReporter.class.getSimpleName() + "-cleaner")
+        .setDaemon(true);
+    hashedWheelTimerThreadFactory = builder.build();
+  }
+
   AsyncReporter(Builder<M, R> builder) {
     this.sender = toAsyncSender(builder);
     this.metrics = builder.metrics;
@@ -71,21 +79,39 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     this.messageTimeoutNanos = builder.messageTimeoutNanos;
     this.bufferedMaxMessages = builder.bufferedMaxMessages;
     this.singleKey = builder.singleKey;
+
     this.flushThreads = builder.flushThreads;
     this.timerThreads = builder.timerThreads;
-    this.queueManager = new QueueManager(builder.pendingMaxMessages,
-                                         builder.overflowStrategy,
-                                         builder.pendingKeepaliveNanos);
+
+    this.queueManager =
+        new QueueManager(builder.pendingMaxMessages, builder.overflowStrategy,
+            builder.pendingKeepaliveNanos, this,
+            metrics, initHashedWheelTimer(builder));
+
     this.flushThreadFactory = new FlushThreadFactory(this);
-    this.bufferPool = new BufferPool(MAX_BUFFER_POOL_ENTRIES, builder.bufferedMaxMessages, builder.singleKey);
+    this.bufferPool = new BufferPool(MAX_BUFFER_POOL_ENTRIES,
+        builder.bufferedMaxMessages, builder.singleKey);
+
     if (messageTimeoutNanos > 0) {
-      this.queueManager.onCreate(new Callback() {
+      this.queueManager.onCreate(new CreateCallback() {
         @Override
         public void call(AbstractSizeBoundedQueue queue) {
           schedulePeriodically(queue.key, messageTimeoutNanos);
         }
       });
     }
+  }
+
+  private static HashedWheelTimer initHashedWheelTimer(Builder<?, ?> builder) {
+    synchronized (AsyncReporter.class) {
+      if (hashedWheelTimer == null) {
+        hashedWheelTimer = new HashedWheelTimer(
+            hashedWheelTimerThreadFactory,
+            builder.tickDurationNanos, TimeUnit.NANOSECONDS,
+            builder.ticksPerWheel);
+      }
+    }
+    return hashedWheelTimer;
   }
 
   AsyncSender<R> toAsyncSender(Builder<M, R> builder) {
@@ -99,9 +125,11 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   public static final class Builder<M extends Message, R> extends Reporter.Builder<M, R> {
 
     int sharedSenderThreads = 1;
-    int flushThreads = DEFAULT_FLUSH_THREADS;
-    int timerThreads = DEFAULT_TIMER_THREADS;
+    int flushThreads = AsyncReporterProperties.DEFAULT_FLUSH_THREADS;
+    int timerThreads = AsyncReporterProperties.DEFAULT_TIMER_THREADS;
     long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
+    long tickDurationNanos = TimeUnit.MILLISECONDS.toNanos(100);
+    int ticksPerWheel = 512;
     boolean singleKey = false;
     int totalQueuedMessages = 100_000;
 
@@ -160,6 +188,18 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     public Builder<M, R> pendingKeepalive(long keepalive, TimeUnit unit) {
       checkArgument(keepalive > 0, "keepalive > 0: %s", keepalive);
       this.pendingKeepaliveNanos = unit.toNanos(keepalive);
+      return this;
+    }
+
+    public Builder<M, R> tickDuration(long tickDuration, TimeUnit unit) {
+      checkArgument(tickDuration > 0, "tickDuration > 0: %s", tickDuration);
+      this.tickDurationNanos = unit.toNanos(tickDuration);
+      return this;
+    }
+
+    public Builder<M, R> ticksPerWheel(int ticksPerWheel) {
+      checkArgument(ticksPerWheel > 0, "ticksPerWheel > 0: %s", ticksPerWheel);
+      this.ticksPerWheel = ticksPerWheel;
       return this;
     }
 
@@ -276,10 +316,6 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   }
 
   Future<?> flush(AbstractSizeBoundedQueue pending) {
-    // Remove overtime queues and relative metrics and timer
-    List<MessageKey> shrinked = queueManager.shrink();
-    clearMetricsAndTimer(shrinked);
-    
     CompositeFuture result;
     Buffer buffer = bufferPool.acquire();
     try {
@@ -301,15 +337,6 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     }
     logWhenFailed(result);
     return result;
-  }
-
-  private void clearMetricsAndTimer(Collection<MessageKey> keys) {
-    for (MessageKey key: keys) {
-      metrics.removeQueuedMessages(key);
-      if (isTimerActive(key)) {
-        cancelTimer(key);
-      }
-    }
   }
 
   /**
@@ -334,27 +361,30 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
+    flush();
+
     if (!closed.compareAndSet(false, true)) return;
+
     close = new CountDownLatch(messageTimeoutNanos > 0 ? flushThreads : 0);
     try {
-      if (!close.await(messageTimeoutNanos, TimeUnit.NANOSECONDS)) {
+      if (!close.await(messageTimeoutNanos * 2, TimeUnit.NANOSECONDS)) {
         logger.warn("Timed out waiting for close");
       }
     } catch (InterruptedException e) {
       logger.warn("Interrupted waiting for close");
       Thread.currentThread().interrupt();
     }
-    flush();
-
-    int dropped = clearPendings();
-    if (dropped > 0) {
-      logger.warn("Dropped " + dropped + " messages due to AsyncReporter.close()");
-    }
 
     if (scheduler != null) {
       clearTimers();
       scheduler.shutdown();
+    }
+    sender.close();
+
+    int dropped = clearPendings();
+    if (dropped > 0) {
+      logger.warn("Dropped " + dropped + " messages due to AsyncReporter.close()");
     }
   }
 
@@ -362,7 +392,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     int count = 0;
     for (AbstractSizeBoundedQueue q : queueManager.elements()) {
       count += q.clear();
-      metrics.removeQueuedMessages(q.key);
+      metrics.removeFromQueuedMessages(q.key);
     }
     queueManager.clear();
     if (count > 0) {

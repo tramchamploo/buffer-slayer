@@ -2,20 +2,26 @@ package io.github.tramchamploo.bufferslayer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 import io.github.tramchamploo.bufferslayer.Message.MessageKey;
 import io.github.tramchamploo.bufferslayer.OverflowStrategy.Strategy;
-import io.github.tramchamploo.bufferslayer.QueueManager.Callback;
+import io.github.tramchamploo.bufferslayer.QueueManager.CreateCallback;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Before;
 import org.junit.Test;
 
-@SuppressWarnings("unchecked")
 public class QueueManagerTest {
 
   private QueueManager manager;
+  @SuppressWarnings("unchecked")
+  private TimeDriven<MessageKey> timeDriven = mock(TimeDriven.class);
+  private ReporterMetrics metrics = mock(ReporterMetrics.class);
 
   private static MessageKey testKey() {
     return new MessageKey() {
@@ -38,8 +44,14 @@ public class QueueManagerTest {
 
   @Before
   public void setup() {
-    manager = new QueueManager(5, Strategy.Fail,
-        TimeUnit.MILLISECONDS.toNanos(10));
+    HashedWheelTimer timer = new HashedWheelTimer(Executors.defaultThreadFactory(),
+        10, TimeUnit.MILLISECONDS,
+        512);
+    timer.start();
+
+    manager = new QueueManager(5,
+        Strategy.Fail, TimeUnit.MILLISECONDS.toNanos(50),
+        timeDriven, metrics, timer);
   }
   
   @Test
@@ -52,7 +64,7 @@ public class QueueManagerTest {
   public void callbackTriggeredAfterCreated() throws InterruptedException {
     CountDownLatch countDown = new CountDownLatch(1);
     AtomicInteger callCount = new AtomicInteger();
-    manager.onCreate(new Callback() {
+    manager.onCreate(new CreateCallback() {
       @Override
       public void call(AbstractSizeBoundedQueue queue) {
         assertEquals(testKey(), queue.key);
@@ -69,15 +81,17 @@ public class QueueManagerTest {
 
   @Test
   public void keepAlive() throws InterruptedException {
-    AbstractSizeBoundedQueue q = manager.getOrCreate(testKey());
-    TimeUnit.MILLISECONDS.sleep(10);
+    MessageKey key = testKey();
+    AbstractSizeBoundedQueue q = manager.getOrCreate(key);
+    TimeUnit.MILLISECONDS.sleep(100);
 
-    assertEquals(testKey(), manager.shrink().get(0));
+    verify(metrics).removeFromQueuedMessages(key);
+    verify(timeDriven).isTimerActive(key);
     assertEquals(0, manager.keyToQueue.size());
     AbstractSizeBoundedQueue q1 = manager.getOrCreate(testKey());
     assertNotEquals(q, q1);
 
-    TimeUnit.MILLISECONDS.sleep(10);
+    TimeUnit.MILLISECONDS.sleep(20);
     manager.getOrCreate(testKey());
     assertEquals(1, manager.keyToQueue.size());
     assertEquals(q1, manager.getOrCreate(testKey()));
@@ -86,8 +100,8 @@ public class QueueManagerTest {
   @Test
   public void singleKeyNeverExpire() throws InterruptedException {
     manager.getOrCreate(Message.SINGLE_KEY);
-    TimeUnit.MILLISECONDS.sleep(10);
+    TimeUnit.MILLISECONDS.sleep(100);
 
-    assertEquals(0, manager.shrink().size());
+    verifyZeroInteractions(metrics);
   }
 }
