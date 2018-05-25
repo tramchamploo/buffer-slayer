@@ -60,6 +60,7 @@ class FlushSynchronizer {
           timeoutNanos = notEmpty.awaitNanos(timeoutNanos);
         } catch (InterruptedException e) {
           wasInterrupted = true;
+          break;
         }
       }
     } finally {

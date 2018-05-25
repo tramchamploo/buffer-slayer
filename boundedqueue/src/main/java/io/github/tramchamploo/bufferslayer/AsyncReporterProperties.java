@@ -5,10 +5,15 @@ import java.util.concurrent.TimeUnit;
 
 public class AsyncReporterProperties extends AbstractReporterProperties {
 
+  static final int DEFAULT_TIMER_THREADS = 1;
+  static final int DEFAULT_FLUSH_THREADS = 1;
+
   private int sharedSenderThreads = 1;
   private long pendingKeepaliveNanos = TimeUnit.SECONDS.toNanos(60);
-  private int flushThreads = AsyncReporter.DEFAULT_FLUSH_THREADS;
-  private int timerThreads = AsyncReporter.DEFAULT_TIMER_THREADS;
+  private long tickDurationNanos = TimeUnit.MILLISECONDS.toNanos(100);
+  private int ticksPerWheel = 512;
+  private int flushThreads = DEFAULT_FLUSH_THREADS;
+  private int timerThreads = DEFAULT_TIMER_THREADS;
   private boolean singleKey = false;
   private int totalQueuedMessages = 100_000;
 
@@ -61,8 +66,26 @@ public class AsyncReporterProperties extends AbstractReporterProperties {
     return pendingKeepaliveNanos;
   }
 
-  public AsyncReporterProperties setPendingKeepaliveNanos(long pendingKeepalive, TimeUnit unit) {
+  public AsyncReporterProperties setPendingKeepalive(long pendingKeepalive, TimeUnit unit) {
     this.pendingKeepaliveNanos = unit.toNanos(pendingKeepalive);
+    return this;
+  }
+
+  public long getTickDurationNanos() {
+    return tickDurationNanos;
+  }
+
+  public AsyncReporterProperties setTickDuration(long tickDuration, TimeUnit unit) {
+    this.tickDurationNanos = unit.toNanos(tickDuration);
+    return this;
+  }
+
+  public int getTicksPerWheel() {
+    return ticksPerWheel;
+  }
+
+  public AsyncReporterProperties setTicksPerWheel(int ticksPerWheel) {
+    this.ticksPerWheel = ticksPerWheel;
     return this;
   }
 
@@ -105,15 +128,17 @@ public class AsyncReporterProperties extends AbstractReporterProperties {
   @Override
   public <M extends Message, R> Builder<M, R> toBuilder(Sender<M, R> sender) {
     Builder<M, R> builder = new Builder<>(sender).sharedSenderThreads(sharedSenderThreads)
-                                           .messageTimeout(messageTimeoutNanos, TimeUnit.NANOSECONDS)
-                                           .pendingKeepalive(pendingKeepaliveNanos, TimeUnit.NANOSECONDS)
-                                           .flushThreads(flushThreads)
-                                           .timerThreads(timerThreads)
-                                           .bufferedMaxMessages(bufferedMaxMessages)
-                                           .pendingMaxMessages(pendingMaxMessages)
-                                           .singleKey(singleKey)
-                                           .overflowStrategy(OverflowStrategy.create(overflowStrategy))
-                                           .totalQueuedMessages(totalQueuedMessages);
+        .messageTimeout(messageTimeoutNanos, TimeUnit.NANOSECONDS)
+        .pendingKeepalive(pendingKeepaliveNanos, TimeUnit.NANOSECONDS)
+        .tickDuration(tickDurationNanos, TimeUnit.NANOSECONDS)
+        .ticksPerWheel(ticksPerWheel)
+        .flushThreads(flushThreads)
+        .timerThreads(timerThreads)
+        .bufferedMaxMessages(bufferedMaxMessages)
+        .pendingMaxMessages(pendingMaxMessages)
+        .singleKey(singleKey)
+        .overflowStrategy(OverflowStrategy.create(overflowStrategy))
+        .totalQueuedMessages(totalQueuedMessages);
     if (metrics.equalsIgnoreCase("inmemory")) {
       builder.metrics(InMemoryReporterMetrics.instance(ReporterMetricsExporter.of(metricsExporter)));
     }

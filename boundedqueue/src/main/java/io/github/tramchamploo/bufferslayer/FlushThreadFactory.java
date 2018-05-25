@@ -47,12 +47,14 @@ class FlushThreadFactory {
     public void run() {
       try {
         while (!reporter.closed.get()) {
-          if (Thread.interrupted()) {
-            logger.error("Interrupted while waiting for a ready queue");
-            break;
-          }
           // wait when no queue is ready
           AbstractSizeBoundedQueue q = synchronizer.poll(reporter.messageTimeoutNanos);
+
+          if (Thread.interrupted()) {
+            logger.warn("Interrupted while waiting for a ready queue");
+            break;
+          }
+
           if (q == null) continue;
           reScheduleAndFlush(q);
         }

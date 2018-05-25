@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.sql.Types;
 import java.util.Date;
 import java.util.HashSet;
@@ -62,8 +63,7 @@ public class BatchJdbcTemplateTest {
   }
 
   @After
-  public void clean() {
-    reporter.flush();
+  public void clean() throws IOException {
     reporter.close();
   }
 

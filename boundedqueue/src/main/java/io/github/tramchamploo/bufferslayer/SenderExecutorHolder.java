@@ -61,7 +61,13 @@ class SenderExecutorHolder {
 
   synchronized boolean close() {
     if (--refCount == 0 && executor != null) {
-      ((ExecutorService) executor).shutdown();
+      ExecutorService executorService = (ExecutorService) this.executor;
+      executorService.shutdown();
+      try {
+        executorService.awaitTermination(500, TimeUnit.MILLISECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
       return true;
     }
     return false;

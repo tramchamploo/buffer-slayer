@@ -28,11 +28,13 @@ public class FakeSender implements Sender<TestMessage, Integer> {
 
   @Override
   public List<Integer> send(List<TestMessage> messages) {
+    onMessages.accept(messages);
+    sent.addAll(messages);
+
     if (closed.get()) {
       throw new IllegalStateException("Closed!");
     }
-    sent.addAll(messages);
-    onMessages.accept(messages);
+
     Integer[] ret = new Integer[messages.size()];
     for (int i = 0; i < messages.size(); i++) {
       ret[i] = messages.get(i).key;

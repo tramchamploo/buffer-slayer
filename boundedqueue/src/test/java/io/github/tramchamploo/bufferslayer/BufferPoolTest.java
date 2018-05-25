@@ -9,7 +9,7 @@ import org.junit.Test;
 
 public class BufferPoolTest {
 
-  BufferPool bufferPool;
+  private BufferPool bufferPool;
 
   @Test
   public void releaseDoNothingWhenFull() {
