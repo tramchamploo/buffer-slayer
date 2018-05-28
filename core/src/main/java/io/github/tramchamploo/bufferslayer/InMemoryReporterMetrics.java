@@ -18,7 +18,10 @@ public class InMemoryReporterMetrics extends ReporterMetrics {
   private static InMemoryReporterMetrics instance;
 
   final ConcurrentHashMap<MetricKey, LongAdderV8> metrics = new ConcurrentHashMap<>();
+
   final ConcurrentHashMap<MessageKey, AtomicLong> queuedMessages = new ConcurrentHashMap<>();
+  // Every update will affect this value, so get will not do calculations in real time
+  private final LongAdderV8 queuedMessagesAccumulator = new LongAdderV8();
 
   private InMemoryReporterMetrics(ReporterMetricsExporter exporter) {
     startExporter(exporter);
@@ -75,11 +78,7 @@ public class InMemoryReporterMetrics extends ReporterMetrics {
 
   @Override
   public long queuedMessages() {
-    long count = 0;
-    for (AtomicLong queued: queuedMessages.values()) {
-      count += queued.get();
-    }
-    return count;
+    return queuedMessagesAccumulator.sum();
   }
 
   @Override
@@ -87,9 +86,13 @@ public class InMemoryReporterMetrics extends ReporterMetrics {
     AtomicLong metric = queuedMessages.get(key);
     if (metric == null) {
       metric = queuedMessages.putIfAbsent(key, new AtomicLong(update));
-      if (metric == null) return;
+      if (metric == null) {
+        queuedMessagesAccumulator.add(update);
+        return;
+      }
     }
-    metric.set(update);
+    long prev = metric.getAndSet(update);
+    queuedMessagesAccumulator.add(update - prev);
   }
 
   @Override
@@ -100,5 +103,6 @@ public class InMemoryReporterMetrics extends ReporterMetrics {
   public void clear() {
     metrics.clear();
     queuedMessages.clear();
+    queuedMessagesAccumulator.reset();
   }
 }
