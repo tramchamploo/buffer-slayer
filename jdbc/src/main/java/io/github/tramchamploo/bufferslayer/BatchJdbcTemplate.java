@@ -3,6 +3,7 @@ package io.github.tramchamploo.bufferslayer;
 import com.google.common.annotations.VisibleForTesting;
 import io.github.tramchamploo.bufferslayer.Sql.Builder;
 import io.github.tramchamploo.bufferslayer.internal.MessageFuture;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -37,9 +38,20 @@ public class BatchJdbcTemplate {
   private final Reporter<Sql, Integer> reporter;
 
   @VisibleForTesting
-  BatchJdbcTemplate(JdbcTemplate delegate, Reporter<Sql, Integer> reporter) {
+  BatchJdbcTemplate(JdbcTemplate delegate, final Reporter<Sql, Integer> reporter) {
     this.delegate = delegate;
     this.reporter = reporter;
+    // Close when shutdown
+    Runtime.getRuntime().addShutdownHook(new Thread() {
+      @Override
+      public void run() {
+        try {
+          reporter.close();
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      }
+    });
   }
 
   @SuppressWarnings("unchecked")
