@@ -332,9 +332,8 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     // Update metrics
     metrics.updateQueuedMessages(pending.key, pending.size());
     // Signal producers
-    if (!memoryLimiter.isMaximum()) {
-      memoryLimiter.signalAll();
-    }
+    memoryLimiter.signalAll();
+
     logWhenFailed(result);
     return result;
   }
