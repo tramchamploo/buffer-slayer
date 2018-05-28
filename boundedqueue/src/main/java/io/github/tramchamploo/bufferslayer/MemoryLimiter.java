@@ -20,7 +20,12 @@ abstract class MemoryLimiter {
   }
 
   /**
-   * Block threads if reach the limit until signaled
+   * Returns true if exceeds memory limit
+   */
+  abstract boolean isMaximum();
+
+  /**
+   * Block current thread if reach the limit until signaled
    */
   abstract void waitWhenMaximum();
 
@@ -41,6 +46,11 @@ abstract class MemoryLimiter {
     private DefaultMemoryLimiter(long maxMessages, ReporterMetrics metrics) {
       this.maxMessages = maxMessages;
       this.metrics = metrics;
+    }
+
+    @Override
+    boolean isMaximum() {
+      return metrics.queuedMessages() >= maxMessages;
     }
 
     @Override
@@ -69,11 +79,6 @@ abstract class MemoryLimiter {
       } finally {
         lock.unlock();
       }
-    }
-
-    private boolean isMaximum() {
-      // This may be an expensive calculation
-      return metrics.queuedMessages() >= maxMessages;
     }
   }
 }
