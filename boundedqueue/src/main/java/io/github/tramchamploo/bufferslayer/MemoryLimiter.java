@@ -2,7 +2,6 @@ package io.github.tramchamploo.bufferslayer;
 
 import com.google.common.base.Preconditions;
 import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,10 +19,14 @@ abstract class MemoryLimiter {
     return new DefaultMemoryLimiter(result, metrics);
   }
 
-  abstract boolean isMaximum();
-
+  /**
+   * Block threads if reach the limit until signaled
+   */
   abstract void waitWhenMaximum();
 
+  /**
+   * Signal all threads that waiting on this memory limiter
+   */
   abstract void signalAll();
 
   private static final class DefaultMemoryLimiter extends MemoryLimiter {
@@ -32,17 +35,12 @@ abstract class MemoryLimiter {
     private final long maxMessages;
     private final ReporterMetrics metrics;
 
-    private final Lock lock = new ReentrantLock();
+    private final ReentrantLock lock = new ReentrantLock();
     private final Condition notFull = lock.newCondition();
 
     private DefaultMemoryLimiter(long maxMessages, ReporterMetrics metrics) {
       this.maxMessages = maxMessages;
       this.metrics = metrics;
-    }
-
-    @Override
-    boolean isMaximum() {
-      return metrics.queuedMessages() >= maxMessages;
     }
 
     @Override
@@ -66,10 +64,16 @@ abstract class MemoryLimiter {
     void signalAll() {
       lock.lock();
       try {
-        notFull.signalAll();
+        if (lock.hasWaiters(notFull) && !isMaximum())
+          notFull.signalAll();
       } finally {
         lock.unlock();
       }
+    }
+
+    private boolean isMaximum() {
+      // This may be an expensive calculation
+      return metrics.queuedMessages() >= maxMessages;
     }
   }
 }
