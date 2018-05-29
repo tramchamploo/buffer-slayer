@@ -97,7 +97,10 @@ public class InMemoryReporterMetrics extends ReporterMetrics {
 
   @Override
   public void removeFromQueuedMessages(MessageKey queueKey) {
-    queuedMessages.remove(queueKey);
+    AtomicLong value = queuedMessages.remove(queueKey);
+    if (value != null) {
+      queuedMessagesAccumulator.add(-value.get());
+    }
   }
 
   public void clear() {
