@@ -26,7 +26,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,8 +57,15 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
   final FlushSynchronizer synchronizer = new FlushSynchronizer();
   final QueueManager queueManager;
 
-  private final AtomicBoolean started = new AtomicBoolean(false);
-  final AtomicBoolean closed = new AtomicBoolean(false);
+  public static final int REPORTER_STATE_INIT = 0;
+  public static final int REPORTER_STATE_STARTED = 1;
+  public static final int REPORTER_STATE_SHUTDOWN = 2;
+  @SuppressWarnings({"unused", "FieldMayBeFinal"})
+  private volatile int reporterState; // 0 - init, 1 - started, 2 - shut down
+
+  static final AtomicIntegerFieldUpdater<AsyncReporter> REPORTER_STATE_UPDATER =
+      AtomicIntegerFieldUpdater.newUpdater(AsyncReporter.class, "reporterState");
+
   CountDownLatch close;
 
   ScheduledExecutorService scheduler;
@@ -252,7 +259,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     checkNotNull(message, "message");
     metrics.incrementMessages(1);
 
-    if (closed.get()) { // Drop the message when closed.
+    if (REPORTER_STATE_UPDATER.get(this) == REPORTER_STATE_SHUTDOWN) { // Drop the message when closed.
       MessageDroppedException cause =
           dropped(new IllegalStateException("closed!"), singletonList(message));
       MessageFuture<R> future = (MessageFuture<R>) message.newFailedFuture(cause);
@@ -261,7 +268,7 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
     }
 
     // Lazy initialize flush threads
-    if (started.compareAndSet(false, true) &&
+    if (REPORTER_STATE_UPDATER.compareAndSet(this, REPORTER_STATE_INIT, REPORTER_STATE_STARTED) &&
         messageTimeoutNanos > 0) {
       startFlushThreads();
     }
@@ -362,9 +369,15 @@ public class AsyncReporter<M extends Message, R> extends TimeDriven<MessageKey> 
 
   @Override
   public void close() throws IOException {
-    flush();
+    if (!REPORTER_STATE_UPDATER.compareAndSet(this, REPORTER_STATE_STARTED, REPORTER_STATE_SHUTDOWN)) {
+      // reporterState can be 0 or 2 at this moment - let it always be 2.
+      if (REPORTER_STATE_UPDATER.getAndSet(this, REPORTER_STATE_SHUTDOWN) != REPORTER_STATE_SHUTDOWN) {
+        sender.close();
+        return;
+      }
+    }
 
-    if (!closed.compareAndSet(false, true)) return;
+    flush();
 
     close = new CountDownLatch(messageTimeoutNanos > 0 ? flushThreads : 0);
     try {

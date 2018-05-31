@@ -1,5 +1,8 @@
 package io.github.tramchamploo.bufferslayer;
 
+import static io.github.tramchamploo.bufferslayer.AsyncReporter.REPORTER_STATE_SHUTDOWN;
+import static io.github.tramchamploo.bufferslayer.AsyncReporter.REPORTER_STATE_UPDATER;
+
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.ThreadFactory;
 import org.slf4j.Logger;
@@ -46,7 +49,7 @@ class FlushThreadFactory {
     @Override
     public void run() {
       try {
-        while (!reporter.closed.get()) {
+        while (REPORTER_STATE_UPDATER.get(reporter) != REPORTER_STATE_SHUTDOWN) {
           // wait when no queue is ready
           AbstractSizeBoundedQueue q = synchronizer.poll(reporter.messageTimeoutNanos);
 
@@ -55,11 +58,13 @@ class FlushThreadFactory {
             break;
           }
 
-          if (q == null) continue;
+          if (q == null)
+            continue;
+
           reScheduleAndFlush(q);
         }
       } finally {
-        if (reporter.closed.get()) { // wake up cleanup thread
+        if (REPORTER_STATE_UPDATER.get(reporter) == REPORTER_STATE_SHUTDOWN) { // wake up cleanup thread
           reporter.close.countDown();
         }
       }
