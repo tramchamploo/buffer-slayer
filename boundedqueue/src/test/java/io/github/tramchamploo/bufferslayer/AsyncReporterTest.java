@@ -70,6 +70,8 @@ public class AsyncReporterTest {
     assertTrue(countDown.await(200, TimeUnit.MILLISECONDS));
     assertEquals(50, sender.sent.size());
 
+    // wait for the queue to be released
+    Thread.sleep(100);
     // make sure the queue is released
     assertEquals(0, reporter.synchronizer.queue.size());
 

@@ -129,7 +129,7 @@ public class BatchJdbcTemplateTest {
 
   @Test
   public void updateFailed() throws InterruptedException {
-    SenderProxy sender = new SenderProxy(new JdbcTemplateSender(underlying));
+    SenderProxy<Sql, Integer> sender = new SenderProxy<>(new JdbcTemplateSender(underlying));
     RuntimeException ex = new RuntimeException();
     sender.onMessages(messages -> { throw ex; });
     reporter = AsyncReporter.builder(sender).messageTimeout(10, TimeUnit.MILLISECONDS).build();

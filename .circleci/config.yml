@@ -5,6 +5,7 @@ jobs:
     working_directory: ~/buffer-slayer
     docker:
       - image: circleci/openjdk:8-jdk-browsers
+      - image: circleci/redis:latest
 
     steps:
       - checkout

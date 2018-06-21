@@ -7,13 +7,13 @@ import java.util.function.Consumer;
 /**
  * Delegate sending and trigger onMessages afterwards
  */
-public class SenderProxy implements Sender<Sql, Integer> {
+public class SenderProxy<M extends Message, R> implements Sender<M, R> {
 
-  private AtomicBoolean closed = new AtomicBoolean(false);
-  private Consumer<List<Integer>> onMessages = messages -> { };
-  final Sender<Sql, Integer> delegate;
+  private final AtomicBoolean closed = new AtomicBoolean(false);
+  private Consumer<List<M>> onMessages = messages -> { };
+  private final Sender<M, R> delegate;
 
-  public SenderProxy(Sender<Sql, Integer> delegate) {
+  SenderProxy(Sender<M, R> delegate) {
     this.delegate = delegate;
   }
 
@@ -28,16 +28,16 @@ public class SenderProxy implements Sender<Sql, Integer> {
   }
 
   @Override
-  public List<Integer> send(List<Sql> messages) {
+  public List<R> send(List<M> messages) {
     if (closed.get()) {
       throw new IllegalStateException("Closed!");
     }
-    List<Integer> sent = delegate.send(messages);
-    onMessages.accept(sent);
+    List<R> sent = delegate.send(messages);
+    onMessages.accept(messages);
     return sent;
   }
 
-  public void onMessages(Consumer<List<Integer>> onMessages) {
+  public void onMessages(Consumer<List<M>> onMessages) {
     this.onMessages = onMessages;
   }
 }

@@ -22,6 +22,7 @@
     <module>jdbc</module>
     <module>benchmark</module>
     <module>rx</module>
+    <module>jedis</module>
   </modules>
 
   <properties>
@@ -107,6 +108,12 @@
         <artifactId>bufferslayer-spring-jdbc</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
+      </dependency>
+
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>bufferslayer-jedis</artifactId>
+        <version>${project.version}</version>
       </dependency>
 
       <dependency>
@@ -256,6 +263,16 @@
     </pluginManagement>
 
     <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <source>${maven.compiler.source}</source>
+          <target>${maven.compiler.target}</target>
+          <testSource>${maven.compiler.testSource}</testSource>
+          <testTarget>${maven.compiler.testTarget}</testTarget>
+        </configuration>
+      </plugin>
+
       <plugin>
         <artifactId>maven-release-plugin</artifactId>
         <version>${maven-release-plugin.version}</version>
