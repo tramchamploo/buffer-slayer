@@ -25,7 +25,7 @@ public abstract class AbstractBatchJdbcTemplateBenchmark {
   private BatchJdbcTemplate batch;
   private JdbcTemplate unbatch;
   private Reporter<Sql, Integer> reporter;
-  private static SenderProxy proxy;
+  private static SenderProxy<Sql, Integer> proxy;
   private static AtomicLong counter = new AtomicLong();
 
   private static final String CREATE_DATABASE = "CREATE DATABASE IF NOT EXISTS test";
@@ -51,7 +51,7 @@ public abstract class AbstractBatchJdbcTemplateBenchmark {
     JdbcTemplate delegate = new JdbcTemplate(dataSource);
     delegate.setDataSource(dataSource);
 
-    proxy = new SenderProxy(new JdbcTemplateSender(delegate));
+    proxy = new SenderProxy<>(new JdbcTemplateSender(delegate));
     proxy.onMessages(updated -> counter.addAndGet(updated.size()));
 
     reporter = reporter(proxy);
